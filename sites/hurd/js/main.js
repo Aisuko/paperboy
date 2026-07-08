@@ -100,11 +100,22 @@ function setActiveNav( key ) {
 
 }
 
+function hideWorldLabels( key ) {
+
+	worlds[ key ].scene.traverse( ( obj ) => {
+
+		if ( obj.isCSS2DObject ) obj.element.style.display = 'none';
+
+	} );
+
+}
+
 function switchWorld( key ) {
 
 	if ( key === currentKey ) return;
 	if ( currentKey === 'boot' ) stopBootAutoplay();
 
+	hideWorldLabels( currentKey );
 	currentKey = key;
 	document.body.dataset.world = key;
 	setActiveNav( key );
