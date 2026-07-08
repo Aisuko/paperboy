@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>GNU Hurd — an interactive 3D tour of a multiserver microkernel</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<meta name="description" content="An interactive 3D explainer of the GNU Hurd: its microkernel core, its servers and translators, its boot sequence, and how it compares to a monolithic kernel." />
+	<link rel="stylesheet" href="css/main.css" />
+</head>
+<body data-world="overview">
+
+	<div id="webgl"></div>
+
+	<div id="loading">
+		<div class="loading-mark">GNU&nbsp;/&nbsp;HURD</div>
+		<div class="loading-bar"><span></span></div>
+		<div class="loading-label">assembling microkernel&hellip;</div>
+	</div>
+
+	<header id="nav">
+		<div class="nav-brand">
+			<span class="nav-brand-gnu">GNU</span><span class="nav-brand-slash">/</span><span class="nav-brand-hurd">HURD</span>
+			<span class="nav-brand-sub">3D field guide</span>
+		</div>
+		<nav class="nav-links">
+			<button class="nav-link" data-goto="overview">
+				<span class="nav-index">01</span>Microkernel
+			</button>
+			<button class="nav-link" data-goto="components">
+				<span class="nav-index">02</span>Components
+			</button>
+			<button class="nav-link" data-goto="boot">
+				<span class="nav-index">03</span>Boot sequence
+			</button>
+			<button class="nav-link" data-goto="compare">
+				<span class="nav-index">04</span>Compare
+			</button>
+		</nav>
+		<a class="nav-source" href="https://www.gnu.org/software/hurd/" target="_blank" rel="noopener">gnu.org/software/hurd ↗</a>
+	</header>
+
+	<!-- ============ 01 OVERVIEW ============ -->
+	<section class="world" data-world-panel="overview">
+		<div class="hud hud-top-left">
+			<div class="eyebrow">01 · What is the GNU Hurd</div>
+			<h1>A kernel made of<br /><em>cooperating strangers.</em></h1>
+			<p class="lede">
+				The GNU Hurd is a collection of user-space servers running on top of the
+				<strong>GNU Mach</strong> microkernel. Instead of one privileged program doing
+				everything, each capability of the OS &mdash; filesystems, networking, process
+				bookkeeping, authentication &mdash; is its own small, replaceable program
+				talking over message passing.
+			</p>
+			<div class="hint">Drag to orbit &middot; scroll to zoom &middot; click any module</div>
+		</div>
+		<div class="hud hud-bottom-left legend" id="overview-legend"></div>
+	</section>
+
+	<!-- ============ 02 COMPONENTS ============ -->
+	<section class="world" data-world-panel="components">
+		<div class="hud hud-top-left">
+			<div class="eyebrow">02 · How many parts does it have</div>
+			<h1><span id="component-count">18</span> servers &amp; translators</h1>
+			<p class="lede">
+				The Hurd ships roughly two dozen cooperating servers and translators; these
+				are the ones you'll meet in a typical running system, grouped by what they
+				do. Click a category to isolate it, click a module for detail.
+			</p>
+		</div>
+		<div class="hud hud-bottom category-chips" id="category-chips"></div>
+	</section>
+
+	<!-- ============ 03 BOOT SEQUENCE ============ -->
+	<section class="world" data-world-panel="boot">
+		<div class="hud hud-top-left">
+			<div class="eyebrow">03 · What starts first</div>
+			<h1>From power-on<br />to login prompt.</h1>
+		</div>
+		<div class="hud hud-top-right boot-step-card" id="boot-step-card">
+			<div class="boot-step-index">Step <span id="boot-step-num">1</span> / <span id="boot-step-total">12</span></div>
+			<h2 id="boot-step-title">GRUB loads the kernel</h2>
+			<p id="boot-step-desc"></p>
+		</div>
+		<div class="hud hud-bottom boot-scrubber">
+			<button id="boot-prev" class="boot-btn" aria-label="Previous step">
+				<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 4 8l6 5"/></svg>
+			</button>
+			<button id="boot-play" class="boot-btn boot-play" aria-label="Play">
+				<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg>
+			</button>
+			<div class="boot-track" id="boot-track"></div>
+			<button id="boot-next" class="boot-btn" aria-label="Next step">
+				<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 5-6 5"/></svg>
+			</button>
+		</div>
+	</section>
+
+	<!-- ============ 04 COMPARE ============ -->
+	<section class="world" data-world-panel="compare">
+		<div class="hud hud-top-left">
+			<div class="eyebrow">04 · Two ways to build an OS</div>
+			<h1>Monolithic vs.<br />microkernel.</h1>
+			<p class="lede" id="compare-lede">
+				On the left, a monolithic kernel (Linux-style): filesystems, drivers, networking
+				and process management are welded into one privileged binary. On the right, the
+				Hurd's microkernel approach: GNU Mach provides only IPC, scheduling and memory,
+				everything else is an ordinary user-space server.
+			</p>
+			<button id="compare-crash-btn" class="compare-btn">Simulate a filesystem-driver crash</button>
+			<div class="compare-note" id="compare-note"></div>
+		</div>
+		<div class="hud hud-label hud-label-left">MONOLITHIC</div>
+		<div class="hud hud-label hud-label-right">MICROKERNEL (HURD)</div>
+	</section>
+
+	<!-- ============ shared component detail card ============ -->
+	<aside id="detail-card" class="detail-card" aria-hidden="true">
+		<button id="detail-close" class="detail-close" aria-label="Close">&times;</button>
+		<div class="detail-category" id="detail-category"></div>
+		<h3 id="detail-name"></h3>
+		<p class="detail-blurb" id="detail-blurb"></p>
+		<p id="detail-description"></p>
+		<div class="detail-block">
+			<h4>Responsibilities</h4>
+			<ul id="detail-responsibilities"></ul>
+		</div>
+		<div class="detail-block detail-mono">
+			<h4>On a monolithic kernel</h4>
+			<p id="detail-monolithic"></p>
+		</div>
+	</aside>
+
+	<footer id="foot-credit">
+		Sources: <a href="https://www.gnu.org/software/hurd/" target="_blank" rel="noopener">gnu.org/software/hurd</a>
+		&middot; <a href="https://en.wikipedia.org/wiki/GNU_Hurd" target="_blank" rel="noopener">Wikipedia: GNU Hurd</a>
+	</footer>
+
+	<script type="importmap">
+		{
+			"imports": {
+				"three": "./vendor/three/build/three.module.js",
+				"three/addons/": "./vendor/three/jsm/"
+			}
+		}
+	</script>
+	<script type="module" src="js/main.js"></script>
+
+</body>
+</html>

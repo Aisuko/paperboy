@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>paperboy — GNU/Hurd 3D field guide</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<style>
+		:root {
+			color-scheme: dark;
+			--bg: #08090c;
+			--fg: #f2f2f2;
+			--muted: #8a8f98;
+			--accent: #6ee7ff;
+			--card-bg: #101319;
+			--card-border: #22262f;
+		}
+		* { box-sizing: border-box; }
+		body {
+			margin: 0;
+			min-height: 100vh;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			gap: 2.5rem;
+			padding: 3rem 1.5rem;
+			background: var(--bg);
+			color: var(--fg);
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+		}
+		h1 {
+			margin: 0;
+			font-size: clamp(1.6rem, 4vw, 2.4rem);
+			letter-spacing: -0.02em;
+			text-align: center;
+		}
+		p.sub {
+			margin: 0.25rem 0 0;
+			color: var(--muted);
+			text-align: center;
+			max-width: 32rem;
+		}
+		.cards {
+			display: grid;
+			gap: 1.25rem;
+			width: 100%;
+			max-width: 26rem;
+		}
+		a.card {
+			display: block;
+			padding: 1.5rem;
+			border-radius: 0.75rem;
+			border: 1px solid var(--card-border);
+			background: var(--card-bg);
+			text-decoration: none;
+			color: inherit;
+			transition: border-color 0.15s ease, transform 0.15s ease;
+		}
+		a.card:hover {
+			border-color: var(--accent);
+			transform: translateY(-2px);
+		}
+		.card h2 {
+			margin: 0 0 0.4rem;
+			font-size: 1.15rem;
+			color: var(--accent);
+		}
+		.card p {
+			margin: 0;
+			font-size: 0.9rem;
+			color: var(--muted);
+			line-height: 1.4;
+		}
+	</style>
+</head>
+<body>
+	<div>
+		<h1>3D webgl explainers</h1>
+		<p class="sub">An interactive three.js scene built to explain systems visually.</p>
+	</div>
+	<div class="cards">
+		<a class="card" href="sites/hurd/">
+			<h2>GNU/Hurd &rarr;</h2>
+			<p>An interactive 3D tour of the GNU Hurd multiserver microkernel: its components, boot sequence, and how it compares to a monolithic kernel.</p>
+		</a>
+	</div>
+</body>
+</html>
