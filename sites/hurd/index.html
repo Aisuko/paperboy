@@ -98,19 +98,22 @@
 	<!-- ============ 04 COMPARE ============ -->
 	<section class="world" data-world-panel="compare">
 		<div class="hud hud-top-left">
-			<div class="eyebrow">04 · Two ways to build an OS</div>
-			<h1>Monolithic vs.<br />microkernel.</h1>
+			<div class="eyebrow">04 · Three ways to build an OS</div>
+			<h1>Monolithic vs. microkernel<br />vs. hybrid.</h1>
 			<p class="lede" id="compare-lede">
-				On the left, a monolithic kernel (Linux-style): filesystems, drivers, networking
-				and process management are welded into one privileged binary. On the right, the
-				Hurd's microkernel approach: GNU Mach provides only IPC, scheduling and memory,
-				everything else is an ordinary user-space server.
+				Every column splits the same way: an <strong>Application</strong> in user mode on top,
+				a kernel/user-mode boundary, and the OS's own services underneath. Monolithic
+				(Linux-style) fuses everything into one privileged kernel block. The Hurd's
+				microkernel keeps only IPC, scheduling and memory in kernel mode and runs every
+				service as an ordinary user-space server. A hybrid kernel splits the difference,
+				pulling the file server and Unix personality server back into kernel mode.
 			</p>
 			<button id="compare-crash-btn" class="compare-btn">Simulate a filesystem-driver crash</button>
 			<div class="compare-note" id="compare-note"></div>
 		</div>
 		<div class="hud hud-label hud-label-left">MONOLITHIC</div>
-		<div class="hud hud-label hud-label-right">MICROKERNEL (HURD)</div>
+		<div class="hud hud-label hud-label-mid">MICROKERNEL (HURD)</div>
+		<div class="hud hud-label hud-label-right">HYBRID</div>
 	</section>
 
 	<!-- ============ shared component detail card ============ -->

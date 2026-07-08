@@ -67,6 +67,12 @@ body::after {
 	white-space: nowrap;
 	transform: translate(-50%, -160%);
 }
+.label2d-dim {
+	font-size: 9px;
+	color: var(--ink-dimmer);
+	background: rgba(6,6,12,0.4);
+	padding: 1px 5px;
+}
 
 /* ---------------- loading ---------------- */
 #loading {
@@ -184,8 +190,9 @@ body[data-world="compare"] .world[data-world-panel="compare"] {
 .compare-btn:hover { background: rgba(255,93,162,0.24); }
 .compare-note { margin-top: 14px; font-size: 13px; line-height: 1.5; color: var(--accent-3); min-height: 1.5em; max-width: 40ch; }
 .hud-label { top: 132px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; color: var(--ink-dimmer); }
-.hud-label-left { left: 50%; transform: translateX(-92%); }
-.hud-label-right { left: 50%; transform: translateX(-8%); }
+.hud-label-left { left: 41%; transform: translateX(-50%); }
+.hud-label-mid { left: 67%; transform: translateX(-50%); }
+.hud-label-right { left: 92%; transform: translateX(-50%); }
 
 /* ---------------- detail card ---------------- */
 .detail-card {
