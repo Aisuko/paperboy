@@ -2,87 +2,164 @@
 <html lang="en">
 <head>
 	<meta charset="utf-8" />
-	<title>paperboy — GNU/Hurd 3D field guide</title>
+	<title>paperboy — 3D field guides for hard-to-see systems</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
-	<style>
-		:root {
-			color-scheme: dark;
-			--bg: #08090c;
-			--fg: #f2f2f2;
-			--muted: #8a8f98;
-			--accent: #6ee7ff;
-			--card-bg: #101319;
-			--card-border: #22262f;
-		}
-		* { box-sizing: border-box; }
-		body {
-			margin: 0;
-			min-height: 100vh;
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-			justify-content: center;
-			gap: 2.5rem;
-			padding: 3rem 1.5rem;
-			background: var(--bg);
-			color: var(--fg);
-			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-		}
-		h1 {
-			margin: 0;
-			font-size: clamp(1.6rem, 4vw, 2.4rem);
-			letter-spacing: -0.02em;
-			text-align: center;
-		}
-		p.sub {
-			margin: 0.25rem 0 0;
-			color: var(--muted);
-			text-align: center;
-			max-width: 32rem;
-		}
-		.cards {
-			display: grid;
-			gap: 1.25rem;
-			width: 100%;
-			max-width: 26rem;
-		}
-		a.card {
-			display: block;
-			padding: 1.5rem;
-			border-radius: 0.75rem;
-			border: 1px solid var(--card-border);
-			background: var(--card-bg);
-			text-decoration: none;
-			color: inherit;
-			transition: border-color 0.15s ease, transform 0.15s ease;
-		}
-		a.card:hover {
-			border-color: var(--accent);
-			transform: translateY(-2px);
-		}
-		.card h2 {
-			margin: 0 0 0.4rem;
-			font-size: 1.15rem;
-			color: var(--accent);
-		}
-		.card p {
-			margin: 0;
-			font-size: 0.9rem;
-			color: var(--muted);
-			line-height: 1.4;
-		}
-	</style>
+	<meta name="description" content="paperboy is a small collection of interactive three.js field guides that make hard-to-see systems easy to explore in 3D. Start with the GNU/Hurd microkernel tour." />
+	<link rel="stylesheet" href="css/main.css" />
 </head>
 <body>
-	<div>
-		<h1>3D webgl explainers</h1>
-		<p class="sub">An interactive three.js scene built to explain systems visually.</p>
-	</div>
-	<div class="cards">
-		<a class="card" href="sites/hurd/">
-			<h2>GNU/Hurd &rarr;</h2>
-			<p>An interactive 3D tour of the GNU Hurd multiserver microkernel: its components, boot sequence, and how it compares to a monolithic kernel.</p>
-		</a>
-	</div>
+
+	<div id="hero-webgl" aria-hidden="true"></div>
+
+	<aside id="sidebar">
+		<div class="brand">
+			<a href="#top" class="brand-mark">paperboy</a>
+			<span class="brand-tag">3D field guides</span>
+		</div>
+
+		<nav class="side-nav">
+			<div class="side-group">
+				<h3>Explore</h3>
+				<a href="#top">Overview</a>
+				<a href="#projects">Projects</a>
+				<a href="#about">About</a>
+			</div>
+			<div class="side-group">
+				<h3>Featured</h3>
+				<a href="sites/hurd/">GNU / Hurd &rarr;</a>
+			</div>
+			<div class="side-group">
+				<h3>Code</h3>
+				<a href="https://github.com/Aisuko/paperboy" target="_blank" rel="noopener">GitHub &#8599;</a>
+				<a href="LICENSE">License (GPL-3.0)</a>
+			</div>
+			<div class="side-group">
+				<h3>Resources</h3>
+				<a href="https://www.gnu.org/software/hurd/" target="_blank" rel="noopener">gnu.org/hurd &#8599;</a>
+				<a href="https://en.wikipedia.org/wiki/GNU_Hurd" target="_blank" rel="noopener">Wikipedia &#8599;</a>
+				<a href="https://threejs.org" target="_blank" rel="noopener">three.js &#8599;</a>
+			</div>
+		</nav>
+
+		<div class="side-foot">
+			<span>&copy; 2026 paperboy</span>
+		</div>
+	</aside>
+
+	<main id="main">
+		<div class="topbar">
+			<div class="crumb">paperboy <span>/</span> field guides</div>
+			<div class="topbar-links">
+				<a href="https://github.com/Aisuko/paperboy" target="_blank" rel="noopener" aria-label="GitHub repository">
+					<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+				</a>
+			</div>
+		</div>
+
+		<section id="top" class="hero">
+			<div class="hero-copy">
+				<div class="eyebrow">paperboy &middot; interactive systems, in 3D</div>
+				<h1>Systems are easier to<br /><em>understand</em> than to explain.</h1>
+				<p class="lede">
+					paperboy is a small collection of interactive three.js field guides &mdash;
+					built to turn systems that are usually just diagrams and manpages into
+					something you can orbit, zoom into, and click apart.
+				</p>
+				<div class="hero-actions">
+					<a class="btn btn-primary" href="sites/hurd/">Launch GNU / Hurd tour &rarr;</a>
+					<a class="btn btn-ghost" href="#about">Why this exists</a>
+				</div>
+			</div>
+			<div class="hero-hint">Drag to orbit the scene &middot; scroll to explore</div>
+		</section>
+
+		<section id="projects" class="projects">
+			<div class="section-head">
+				<span class="section-index">01</span>
+				<h2>Projects</h2>
+				<p>One live field guide so far, more on the way.</p>
+			</div>
+
+			<a class="showcase-card" href="sites/hurd/">
+				<div class="showcase-visual">
+					<svg class="node-graph" viewBox="0 0 400 260" aria-hidden="true">
+						<g class="ng-edges" stroke="currentColor" fill="none">
+							<line x1="200" y1="130" x2="90" y2="60" />
+							<line x1="200" y1="130" x2="310" y2="55" />
+							<line x1="200" y1="130" x2="70" y2="180" />
+							<line x1="200" y1="130" x2="200" y2="220" />
+							<line x1="200" y1="130" x2="330" y2="190" />
+							<line x1="90" y1="60" x2="200" y2="30" />
+							<line x1="310" y1="55" x2="200" y2="30" />
+						</g>
+						<g class="ng-nodes">
+							<circle cx="200" cy="130" r="10" class="ng-core" />
+							<circle cx="90" cy="60" r="6" />
+							<circle cx="310" cy="55" r="6" />
+							<circle cx="70" cy="180" r="6" />
+							<circle cx="200" cy="220" r="6" />
+							<circle cx="330" cy="190" r="6" />
+							<circle cx="200" cy="30" r="5" />
+						</g>
+					</svg>
+					<span class="showcase-badge">live 3D tour</span>
+				</div>
+				<div class="showcase-body">
+					<div class="showcase-kicker">Microkernel &middot; components &middot; boot sequence</div>
+					<h3>GNU / Hurd <span class="arrow">&rarr;</span></h3>
+					<p>
+						An interactive tour of the Hurd's multiserver microkernel: its servers
+						and translators, its boot sequence, and how it compares to a
+						monolithic kernel. Drag to orbit, click any module for detail.
+					</p>
+					<div class="showcase-tags">
+						<span>three.js</span>
+						<span>WebGL</span>
+						<span>GNU Mach</span>
+					</div>
+				</div>
+			</a>
+		</section>
+
+		<section id="about" class="about">
+			<div class="section-head">
+				<span class="section-index">02</span>
+				<h2>About</h2>
+			</div>
+			<p>
+				I joined the <a href="https://savannah.gnu.org/project/memberlist.php?group=hurd" target="_blank" rel="noopener">GNU Hurd project</a>
+				back in 2021, and the learning curve was brutal &mdash; a multiserver
+				microkernel, translators, capability-passing ports, decades of mailing-list
+				history. This repo is the field guide I wish I'd had: an interactive
+				explainer of the Hurd's microkernel core, built so the next person doesn't
+				bounce off the learning curve the way I did.
+			</p>
+			<p>
+				It's also a small experiment about AI, authorship, and what "free software"
+				means once you compare it to how "open" software gets built today.
+				<a href="https://github.com/Aisuko/paperboy#readme" target="_blank" rel="noopener">Read the full story on GitHub &#8599;</a>
+			</p>
+		</section>
+
+		<footer id="foot">
+			<span>Built with three.js &middot; no build step, static HTML/WebGL.</span>
+			<a href="https://github.com/Aisuko/paperboy" target="_blank" rel="noopener">github.com/Aisuko/paperboy &#8599;</a>
+		</footer>
+	</main>
+
+	<a class="fab" href="https://github.com/Aisuko/paperboy" target="_blank" rel="noopener">
+		<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+		View source
+	</a>
+
+	<script type="importmap">
+		{
+			"imports": {
+				"three": "./sites/hurd/vendor/three/build/three.module.js"
+			}
+		}
+	</script>
+	<script type="module" src="js/hero-scene.js"></script>
+
 </body>
 </html>
