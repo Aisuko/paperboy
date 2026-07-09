@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<title>Cortex — an interactive 3D tour of a decoder-only Transformer</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<meta name="description" content="An interactive 3D explainer of a decoder-only Transformer: tokenization, embeddings, the transformer block, multi-head self-attention, decoding, and training vs. inference." />
+	<link rel="stylesheet" href="css/main.css" />
+</head>
+<body data-world="tokenize">
+
+	<div id="webgl"></div>
+
+	<div id="loading">
+		<div class="loading-mark">CORTEX</div>
+		<div class="loading-bar"><span></span></div>
+		<div class="loading-label">warming up the attention heads&hellip;</div>
+	</div>
+
+	<header id="nav">
+		<div class="nav-brand">
+			<span class="nav-brand-a">neural</span><span class="nav-brand-slash">/</span><span class="nav-brand-b">CORTEX</span>
+			<span class="nav-brand-sub">3D field guide</span>
+		</div>
+		<nav class="nav-links">
+			<button class="nav-link" data-goto="tokenize">
+				<span class="nav-index">01</span>Tokenize
+			</button>
+			<button class="nav-link" data-goto="block">
+				<span class="nav-index">02</span>Block
+			</button>
+			<button class="nav-link" data-goto="attention">
+				<span class="nav-index">03</span>Attention
+			</button>
+			<button class="nav-link" data-goto="decode">
+				<span class="nav-index">04</span>Decode
+			</button>
+			<button class="nav-link" data-goto="train">
+				<span class="nav-index">05</span>Train vs Infer
+			</button>
+			<button class="nav-link" data-goto="glossary">
+				<span class="nav-index">06</span>Glossary
+			</button>
+		</nav>
+		<a class="nav-source" href="../../">&larr; Home</a>
+	</header>
+
+	<!-- ============ 01 TOKENIZE & EMBED ============ -->
+	<section class="world" data-world-panel="tokenize">
+		<div class="hud hud-top-left">
+			<div class="eyebrow">01 · From text to vectors</div>
+			<h1>Words become<br /><em>numbers.</em></h1>
+			<p class="lede">
+				<code>"How the weather today?"</code> is split into tokens, each token maps to an
+				integer ID, and each ID indexes into an embedding matrix — a continuous vector the
+				transformer can actually compute with.
+			</p>
+			<div class="hint">Drag to orbit &middot; scroll to zoom &middot; click a token</div>
+		</div>
+		<div class="hud hud-bottom category-chips" id="tokenize-chips"></div>
+	</section>
+
+	<!-- ============ 02 TRANSFORMER BLOCK ============ -->
+	<section class="world" data-world-panel="block">
+		<div class="hud hud-top-left">
+			<div class="eyebrow">02 · Inside one decoder layer</div>
+			<h1>Six stages,<br />one residual stream.</h1>
+		</div>
+		<div class="hud hud-top-right step-card" id="block-step-card">
+			<div class="step-card-index">Stage <span id="block-step-num">1</span> / <span id="block-step-total">6</span></div>
+			<h2 id="block-step-title">RMSNorm</h2>
+			<p id="block-step-desc"></p>
+		</div>
+		<div class="hud hud-bottom scrubber">
+			<button id="block-prev" class="scrubber-btn" aria-label="Previous stage">
+				<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 4 8l6 5"/></svg>
+			</button>
+			<button id="block-play" class="scrubber-btn scrubber-play" aria-label="Play">
+				<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg>
+			</button>
+			<div class="scrubber-track" id="block-track"></div>
+			<button id="block-next" class="scrubber-btn" aria-label="Next stage">
+				<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 5-6 5"/></svg>
+			</button>
+		</div>
+	</section>
+
+	<!-- ============ 03 SELF-ATTENTION DEEP-DIVE ============ -->
+	<section class="world" data-world-panel="attention">
+		<div class="hud hud-top-left">
+			<div class="eyebrow">03 · The core mechanism</div>
+			<h1>Every token looks back<br /><em>at what came before.</em></h1>
+		</div>
+		<div class="hud hud-top-right step-card" id="attn-step-card">
+			<div class="step-card-index">Step <span id="attn-step-num">1</span> / <span id="attn-step-total">7</span></div>
+			<h2 id="attn-step-title">Compute Q, K, V for each head</h2>
+			<p id="attn-step-desc"></p>
+			<pre id="attn-step-equations"></pre>
+		</div>
+		<div class="hud hud-bottom scrubber">
+			<button id="attn-prev" class="scrubber-btn" aria-label="Previous step">
+				<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 4 8l6 5"/></svg>
+			</button>
+			<button id="attn-play" class="scrubber-btn scrubber-play" aria-label="Play">
+				<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg>
+			</button>
+			<div class="scrubber-track" id="attn-track"></div>
+			<button id="attn-next" class="scrubber-btn" aria-label="Next step">
+				<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 5-6 5"/></svg>
+			</button>
+		</div>
+	</section>
+
+	<!-- ============ 04 DECODE ============ -->
+	<section class="world" data-world-panel="decode">
+		<div class="hud hud-top-left">
+			<div class="eyebrow">04 · From hidden state to next token</div>
+			<h1>Logits become<br />a probability.</h1>
+			<p class="lede">
+				<code>lm_head</code> projects the final hidden state into one logit per vocabulary
+				token, then softmax turns those logits into probabilities that sum to 1.
+			</p>
+		</div>
+		<div class="hud hud-bottom-left category-chips" id="decode-stage-chips"></div>
+		<div class="hud hud-bottom category-chips" id="decode-sample-chips"></div>
+	</section>
+
+	<!-- ============ 05 TRAIN VS INFER ============ -->
+	<section class="world" data-world-panel="train">
+		<div class="hud hud-top-left">
+			<div class="eyebrow">05 · Training vs. inference</div>
+			<h1>One number tells you<br /><em>how wrong you were.</em></h1>
+			<p class="lede">
+				During training, NLL measures how much probability the model assigned to the
+				correct next token. Lower NLL means the model was more confident in the right
+				answer.
+			</p>
+			<div class="hint">Correct next token: "weather" (id 610)</div>
+		</div>
+		<div class="hud hud-top-right step-card">
+			<h2>Logits, log-probs, NLL</h2>
+			<table class="concept-table" id="score-table"></table>
+		</div>
+	</section>
+
+	<!-- ============ 06 GLOSSARY ============ -->
+	<section class="world" data-world-panel="glossary">
+		<div class="hud hud-top-left">
+			<div class="eyebrow">06 · Key terms</div>
+			<h1>Six words worth<br />knowing.</h1>
+			<p class="lede">Click any node for a concise definition and where it showed up in the tour.</p>
+			<div class="hint">Drag to orbit &middot; click a term</div>
+		</div>
+	</section>
+
+	<!-- ============ shared detail card ============ -->
+	<aside id="detail-card" class="detail-card" aria-hidden="true">
+		<button id="detail-close" class="detail-close" aria-label="Close">&times;</button>
+		<div class="detail-category" id="detail-category"></div>
+		<h3 id="detail-name"></h3>
+		<p class="detail-blurb" id="detail-blurb"></p>
+		<p id="detail-description"></p>
+		<div class="detail-block" id="detail-metric-block">
+			<h4 id="detail-metric-label">Value</h4>
+			<p class="detail-metric" id="detail-metric"></p>
+		</div>
+	</aside>
+
+	<footer id="foot-credit">
+		Content adapted from the Neural Explainer Hub &middot;
+		<a href="../../">paperboy</a>
+	</footer>
+
+	<script type="importmap">
+		{
+			"imports": {
+				"three": "./vendor/three/build/three.webgpu.js",
+				"three/webgpu": "./vendor/three/build/three.webgpu.js",
+				"three/tsl": "./vendor/three/build/three.tsl.js",
+				"three/addons/": "./vendor/three/jsm/"
+			}
+		}
+	</script>
+	<script type="module" src="js/main.js"></script>
+
+</body>
+</html>
