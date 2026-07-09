@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { addStandardLighting, createStarfield } from '../utils/sceneKit.js';
 
-// The "07 · Run it for real" page points at the real, installable GNU Hurd
-// rather than modelling one of its internals, so the backdrop mocks up the
-// one thing that page is actually about: a QEMU window booting the Hurd for
-// real, typed out onto the monitor screen as a looping boot log.
+// The "07 · Boot simulation" page points at the real, installable GNU Hurd
+// rather than modelling one of its internals, so instead of step-by-step
+// instructions it mocks up the one thing that page is actually about: a
+// QEMU window booting the Hurd for real, typed out as a looping boot log
+// on a screen that's scaled every frame to fit inside the viewport.
 const TERMINAL_LINES = [
 	{ text: '$ qemu-system-i386 -m 1024 -hda hurd-disk.img', color: '#4dc3ff' },
 	{ text: 'SeaBIOS (version 1.16.0-1)', color: '#7d8aa3' },
@@ -32,11 +33,28 @@ const TOTAL_CHARS = TERMINAL_LINES.reduce( ( sum, line ) => sum + line.text.leng
 const CHARS_PER_SECOND = 26;
 const HOLD_SECONDS = 3.5;
 
-const CANVAS_W = 896;
-const CANVAS_H = 512;
-const PADDING = 18;
-const LINE_HEIGHT = 24;
-const FONT = `16px "JetBrains Mono", ui-monospace, SFMono-Regular, monospace`;
+const CANVAS_W = 1600;
+const CANVAS_H = 900;
+const PADDING = 32;
+const LINE_HEIGHT = 40;
+const FONT = `24px "JetBrains Mono", ui-monospace, SFMono-Regular, monospace`;
+
+// The screen is the main page content now (no more step-by-step HUD panel
+// next to it), so instead of a small monitor floating in the scene, it's
+// scaled every frame to fit inside the viewport at this fixed camera
+// distance — sized so the boot log always stays fully on screen instead of
+// running off the edges of the window.
+// Kept above OrbitControls' minDistance (2.5, set in main.js) so the shared
+// controls don't clamp the camera back out and break the fit math.
+const CAMERA_DISTANCE = 2.6;
+const FOV_RADIANS = 45 * Math.PI / 180;
+const SCREEN_BASE_WIDTH = 2.2;
+const SCREEN_BASE_HEIGHT = SCREEN_BASE_WIDTH * ( CANVAS_H / CANVAS_W );
+const SCREEN_MARGIN = 0.94;
+
+// Reserve room at the top of the viewport for the "07 · Take it further"
+// label so the boot log sits under it instead of behind it.
+const TOP_CLEARANCE_PX = 170;
 
 function createTerminalScreen() {
 
@@ -130,19 +148,9 @@ export function buildQemuWorld() {
 
 	const monitor = new THREE.Group();
 
-	const frame = new THREE.Mesh(
-		new THREE.BoxGeometry( 2.4, 1.5, 0.12 ),
-		new THREE.MeshStandardMaterial( { color: 0x0d0d14, metalness: 0.6, roughness: 0.35 } ),
-	);
-	monitor.add( frame );
-	monitor.add( new THREE.LineSegments(
-		new THREE.EdgesGeometry( new THREE.BoxGeometry( 2.4, 1.5, 0.12 ) ),
-		new THREE.LineBasicMaterial( { color: 0x4dc3ff, transparent: true, opacity: 0.55 } ),
-	) );
-
 	const terminal = createTerminalScreen();
 	const screen = new THREE.Mesh(
-		new THREE.PlaneGeometry( 2.1, 1.2 ),
+		new THREE.PlaneGeometry( SCREEN_BASE_WIDTH, SCREEN_BASE_HEIGHT ),
 		new THREE.MeshBasicMaterial( { map: terminal.texture, toneMapped: false } ),
 	);
 	screen.position.z = 0.07;
@@ -152,50 +160,44 @@ export function buildQemuWorld() {
 	glow.position.set( 0, 0, 0.6 );
 	monitor.add( glow );
 
-	const stand = new THREE.Mesh(
-		new THREE.CylinderGeometry( 0.06, 0.28, 0.5, 16 ),
-		new THREE.MeshStandardMaterial( { color: 0x14141c, metalness: 0.6, roughness: 0.4 } ),
-	);
-	stand.position.y = -1.0;
-	monitor.add( stand );
-
-	// A small disk-activity LED on the stand, flickering with the "boot",
-	// so the scene reads as a machine doing something, not a framed poster.
-	const led = new THREE.Mesh(
-		new THREE.SphereGeometry( 0.03, 12, 12 ),
-		new THREE.MeshBasicMaterial( { color: 0x4ce07a, toneMapped: false } ),
-	);
-	led.position.set( 0.32, -0.86, 0.2 );
-	monitor.add( led );
-
 	rig.add( monitor );
 
-	monitor.userData.spin = 0.03;
+	// "Contain" fit (the opposite of the old cover fit) — scales the screen
+	// to the largest size that still fits entirely inside the viewport, so
+	// the boot log never runs off the edges of the window. The available
+	// height is shrunk by TOP_CLEARANCE_PX first, and the screen is then
+	// anchored under that reserved band rather than centered over it.
+	function applyContainScale() {
 
-	let elapsed = 0;
-	let ledTimer = 0;
+		const aspect = window.innerWidth / window.innerHeight;
+		const visibleHeight = 2 * CAMERA_DISTANCE * Math.tan( FOV_RADIANS / 2 );
+		const visibleWidth = visibleHeight * aspect;
+		const worldPerPixel = visibleHeight / window.innerHeight;
+		const reservedTop = TOP_CLEARANCE_PX * worldPerPixel;
+		const availableHeight = Math.max( 0.1, visibleHeight - reservedTop );
+
+		const scale = SCREEN_MARGIN * Math.min( visibleWidth / SCREEN_BASE_WIDTH, availableHeight / SCREEN_BASE_HEIGHT );
+		monitor.scale.setScalar( scale );
+
+		const planeHeight = SCREEN_BASE_HEIGHT * scale;
+		const topEdgeY = visibleHeight / 2 - reservedTop;
+		monitor.position.y = topEdgeY - planeHeight / 2;
+
+	}
+
+	applyContainScale();
 
 	return {
 		scene,
 		interactables: [],
 		defaultView: {
-			position: new THREE.Vector3( 0, 0.4, 4.6 ),
-			target: new THREE.Vector3( 0, -0.1, 0 ),
+			position: new THREE.Vector3( 0, 0, CAMERA_DISTANCE ),
+			target: new THREE.Vector3( 0, 0, 0 ),
 		},
 		update( dt ) {
 
-			elapsed += dt;
-			monitor.rotation.y = Math.sin( elapsed * 0.15 ) * 0.1;
-
+			applyContainScale();
 			terminal.update( dt );
-
-			ledTimer += dt;
-			if ( ledTimer > ( 0.15 + Math.random() * 0.35 ) ) {
-
-				ledTimer = 0;
-				led.visible = Math.random() > 0.25;
-
-			}
 
 		},
 	};

@@ -18,7 +18,6 @@ import { buildQemuWorld } from './worlds/qemu.js';
 import { SHELL_COMMANDS, parseShellInput } from './data/shellCommands.js';
 import { TRANSLATOR_OPTIONS } from './data/translators.js';
 import { getIpcExample } from './data/ipcExamples.js';
-import { QEMU_STEPS, QEMU_LINKS } from './data/qemuGuide.js';
 import { tween, tweenVec3, updateTweens, Easing } from './utils/tween.js';
 
 // ---------------------------------------------------------------- renderer
@@ -89,13 +88,13 @@ function setScene( key ) {
 
 }
 
-function flyCameraTo( view, duration = 1.1 ) {
+function flyCameraTo( view, duration = 1.1, { lock = false } = {} ) {
 
 	controls.enabled = false;
 	tweenVec3( camera.position, view.position, duration, { easing: Easing.cubicInOut } );
 	tweenVec3( controls.target, view.target, duration, {
 		easing: Easing.cubicInOut,
-		onComplete: () => { controls.enabled = true; },
+		onComplete: () => { controls.enabled = ! lock; },
 	} );
 
 }
@@ -143,6 +142,13 @@ function switchWorld( key ) {
 		resetShellUI();
 		flyCameraTo( worlds.shell.defaultView, 1.2 );
 		setTimeout( () => shellInputEl.focus(), 700 );
+
+	} else if ( key === 'qemu' ) {
+
+		// The qemu page is a fullscreen "screen", not a 3D object to inspect —
+		// keep the shared orbit/zoom controls locked out so scrolling or
+		// dragging can't pull the camera away from the cover-fit view.
+		flyCameraTo( worlds.qemu.defaultView, 1.2, { lock: true } );
 
 	} else {
 
@@ -640,88 +646,6 @@ translatorDetachBtn.addEventListener( 'click', () => {
 } );
 
 updateTranslatorButtons();
-
-// ---------------------------------------------------------------- run it for real (qemu)
-
-function copyToClipboard( text, btn ) {
-
-	const restore = btn.textContent;
-	const onDone = ( label ) => { btn.textContent = label; setTimeout( () => { btn.textContent = restore; }, 1200 ); };
-
-	function legacyCopy() {
-
-		const textarea = document.createElement( 'textarea' );
-		textarea.value = text;
-		textarea.style.position = 'fixed';
-		textarea.style.opacity = '0';
-		document.body.appendChild( textarea );
-		textarea.select();
-		let ok = false;
-		try { ok = document.execCommand( 'copy' ); } catch ( e ) { ok = false; }
-		document.body.removeChild( textarea );
-		onDone( ok ? 'Copied' : 'Copy failed' );
-
-	}
-
-	if ( navigator.clipboard && navigator.clipboard.writeText ) {
-
-		navigator.clipboard.writeText( text ).then( () => onDone( 'Copied' ) ).catch( legacyCopy );
-
-	} else {
-
-		legacyCopy();
-
-	}
-
-}
-
-const qemuStepsEl = document.getElementById( 'qemu-steps' );
-QEMU_STEPS.forEach( ( step, i ) => {
-
-	const wrap = document.createElement( 'div' );
-	wrap.className = 'qemu-step';
-
-	const title = document.createElement( 'div' );
-	title.className = 'qemu-step-title';
-	title.innerHTML = `<span class="qemu-step-num">${ i + 1 }.</span> ${ step.title }`;
-	wrap.appendChild( title );
-
-	const desc = document.createElement( 'p' );
-	desc.className = 'qemu-step-desc';
-	desc.textContent = step.description;
-	wrap.appendChild( desc );
-
-	const row = document.createElement( 'div' );
-	row.className = 'qemu-step-cmd-row';
-
-	const cmd = document.createElement( 'pre' );
-	cmd.className = 'qemu-step-cmd';
-	cmd.textContent = step.command;
-	row.appendChild( cmd );
-
-	const copyBtn = document.createElement( 'button' );
-	copyBtn.type = 'button';
-	copyBtn.className = 'qemu-copy-btn';
-	copyBtn.textContent = 'Copy';
-	copyBtn.addEventListener( 'click', () => copyToClipboard( step.command, copyBtn ) );
-	row.appendChild( copyBtn );
-
-	wrap.appendChild( row );
-	qemuStepsEl.appendChild( wrap );
-
-} );
-
-const qemuLinksEl = document.getElementById( 'qemu-links' );
-QEMU_LINKS.forEach( ( link ) => {
-
-	const a = document.createElement( 'a' );
-	a.href = link.href;
-	a.target = '_blank';
-	a.rel = 'noopener';
-	a.textContent = link.label + ' ↗';
-	qemuLinksEl.appendChild( a );
-
-} );
 
 // ---------------------------------------------------------------- boot / loading
 
