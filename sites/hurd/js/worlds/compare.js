@@ -5,7 +5,7 @@ import { getComponent, CATEGORIES } from '../data/components.js';
 import { createComponentObject, pulseHeart } from '../components3d.js';
 import { addStandardLighting, createStarfield } from '../utils/sceneKit.js';
 import { IPCLink } from '../utils/ipcLink.js';
-import { tween } from '../utils/tween.js';
+import { tween, Easing } from '../utils/tween.js';
 
 // Three-column layout modelled on references/screenshots/kernel_structure.png:
 // an "Application" block sits in user mode at the top of every column, a
@@ -321,39 +321,41 @@ export function buildCompareWorld() {
 
 		// 3. Microkernel: only the ext2fs translator dies; everything else,
 		// including the kernel itself, keeps running.
-		setNote( 'Microkernel: the Hurd’s ext2fs translator crashes alone — auth, proc and networking keep running, and it can simply be restarted.' );
+		setNote( 'Microkernel: the Hurd’s ext2fs translator crashes alone — auth, proc and networking keep running.' );
 		if ( microFileServer ) {
 
+			// 3a. The old instance dies outright — flashes red and collapses to
+			// nothing, instead of just dimming — to read as "gone", not "hurt".
 			await tweenAsync( 0.5, ( t ) => {
 
 				microFileServer.traverse( ( child ) => {
 
 					if ( child.material && child.material.emissive ) {
 
-						child.material.emissive.lerpColors( new THREE.Color( CATEGORIES.filesystem.color ), crashColor, t );
+						child.material.emissive.lerpColors( new THREE.Color( CATEGORIES.filesystem.color ), crashColor, Math.min( 1, t * 1.6 ) );
 
 					}
 
 				} );
-				microFileServer.scale.setScalar( 0.72 * ( 1 - t * 0.6 ) );
+				microFileServer.scale.setScalar( 0.72 * ( 1 - t ) );
 
 			} );
-			await wait( 700 );
-			await tweenAsync( 0.6, ( t ) => {
+			setNote( 'ext2fs is gone. exec spawns a fresh instance — nothing else in the system needs to know or care.' );
+			await wait( 650 );
 
-				microFileServer.traverse( ( child ) => {
+			// 3b. A brand-new instance pops in from nothing at the same spot —
+			// a real spawn, not the old one healing.
+			microFileServer.traverse( ( child ) => {
 
-					if ( child.material && child.material.emissive ) {
-
-						child.material.emissive.lerpColors( crashColor, new THREE.Color( CATEGORIES.filesystem.color ), t );
-
-					}
-
-				} );
-				microFileServer.scale.setScalar( 0.72 * ( 0.4 + t * 0.6 ) );
+				if ( child.material && child.material.emissive ) child.material.emissive.set( new THREE.Color( CATEGORIES.filesystem.color ) );
 
 			} );
-			setNote( 'ext2fs restarted. The rest of the system never noticed.' );
+			await tweenAsync( 0.5, ( t ) => {
+
+				microFileServer.scale.setScalar( 0.72 * t );
+
+			}, { easing: Easing.backOut } );
+			setNote( 'A new ext2fs is running with a fresh PID. The rest of the system never noticed.' );
 
 		}
 

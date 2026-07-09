@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { getComponent, CATEGORIES } from '../data/components.js';
 import { createComponentObject, pulseHeart } from '../components3d.js';
-import { addStandardLighting, createStarfield } from '../utils/sceneKit.js';
+import { addStandardLighting, createStarfield, disposeObject3D, disposeLink } from '../utils/sceneKit.js';
 import { IPCLink } from '../utils/ipcLink.js';
 import { tween, Easing } from '../utils/tween.js';
 
@@ -20,32 +20,6 @@ function resolveStepComponent( step ) {
 	if ( comp ) return comp;
 	const look = EXTERNAL_LOOK[ step.componentId ] || EXTERNAL_LOOK.bash;
 	return { id: step.componentId, name: look.name, category: look.category, shape: look.shape };
-
-}
-
-function disposeObject3D( obj ) {
-
-	obj.traverse( ( child ) => {
-
-		if ( child.geometry ) child.geometry.dispose();
-		if ( child.material ) {
-
-			const mats = Array.isArray( child.material ) ? child.material : [ child.material ];
-			mats.forEach( ( m ) => m.dispose() );
-
-		}
-		if ( child.isCSS2DObject && child.element && child.element.parentNode ) child.element.parentNode.removeChild( child.element );
-
-	} );
-	if ( obj.parent ) obj.parent.remove( obj );
-
-}
-
-function disposeLink( link ) {
-
-	link.dispose();
-	if ( link.tube.parent ) link.tube.parent.remove( link.tube );
-	link.particles.forEach( ( p ) => { if ( p.parent ) p.parent.remove( p ); } );
 
 }
 
