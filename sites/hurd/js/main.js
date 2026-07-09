@@ -12,6 +12,8 @@ import { buildOverviewWorld } from './worlds/overview.js';
 import { buildComponentsWorld } from './worlds/components.js';
 import { buildBootWorld } from './worlds/boot.js';
 import { buildCompareWorld } from './worlds/compare.js';
+import { buildShellWorld } from './worlds/shell.js';
+import { SHELL_COMMANDS, parseShellInput } from './data/shellCommands.js';
 import { tween, tweenVec3, updateTweens, Easing } from './utils/tween.js';
 
 // ---------------------------------------------------------------- renderer
@@ -65,6 +67,7 @@ const worlds = {
 	components: buildComponentsWorld(),
 	boot: buildBootWorld(),
 	compare: buildCompareWorld(),
+	shell: buildShellWorld(),
 };
 
 let currentKey = 'overview';
@@ -114,6 +117,7 @@ function switchWorld( key ) {
 
 	if ( key === currentKey ) return;
 	if ( currentKey === 'boot' ) stopBootAutoplay();
+	if ( currentKey === 'shell' ) stopShellAutoplay();
 
 	hideWorldLabels( currentKey );
 	currentKey = key;
@@ -126,6 +130,12 @@ function switchWorld( key ) {
 
 		resetBootUI();
 		flyCameraTo( worlds.boot.getStepView( 0 ), 1.2 );
+
+	} else if ( key === 'shell' ) {
+
+		resetShellUI();
+		flyCameraTo( worlds.shell.defaultView, 1.2 );
+		setTimeout( () => shellInputEl.focus(), 700 );
 
 	} else {
 
@@ -220,6 +230,14 @@ renderer.domElement.addEventListener( 'click', ( event ) => {
 		let node = hit;
 		while ( node && node.userData.stepIndex === undefined ) node = node.parent;
 		if ( node ) goToBootStep( node.userData.stepIndex );
+
+	}
+
+	if ( currentKey === 'shell' ) {
+
+		let node = hit;
+		while ( node && node.userData.stepIndex === undefined ) node = node.parent;
+		if ( node ) goToShellStep( node.userData.stepIndex );
 
 	}
 
@@ -383,6 +401,152 @@ document.getElementById( 'compare-crash-btn' ).addEventListener( 'click', () => 
 	worlds.compare.triggerCrash( ( text ) => { compareNote.textContent = text; } );
 
 } );
+
+// ---------------------------------------------------------------- shell terminal
+
+const shellForm = document.getElementById( 'shell-form' );
+const shellInputEl = document.getElementById( 'shell-input' );
+const shellOutputEl = document.getElementById( 'shell-output' );
+const shellChipsEl = document.getElementById( 'shell-chips' );
+const shellStepNum = document.getElementById( 'shell-step-num' );
+const shellStepTotal = document.getElementById( 'shell-step-total' );
+const shellStepTitle = document.getElementById( 'shell-step-title' );
+const shellStepDesc = document.getElementById( 'shell-step-desc' );
+
+const IDLE_SHELL_STEPS = [
+	{ title: 'Waiting for input', description: 'Type a command into the terminal below and press Enter.' },
+];
+
+let shellSteps = IDLE_SHELL_STEPS;
+let shellIndex = 0;
+let shellAutoplayTimer = null;
+
+function updateShellStepUI() {
+
+	const step = shellSteps[ shellIndex ];
+	shellStepNum.textContent = String( shellIndex + 1 );
+	shellStepTotal.textContent = String( shellSteps.length );
+	shellStepTitle.textContent = step.title;
+	shellStepDesc.textContent = step.description;
+
+}
+
+function stopShellAutoplay() {
+
+	if ( shellAutoplayTimer ) {
+
+		clearInterval( shellAutoplayTimer );
+		shellAutoplayTimer = null;
+
+	}
+
+}
+
+function goToShellStep( index ) {
+
+	shellIndex = Math.max( 0, Math.min( shellSteps.length - 1, index ) );
+	worlds.shell.goToStep( shellIndex );
+	updateShellStepUI();
+	flyCameraTo( worlds.shell.getStepView( shellIndex ), 0.9 );
+
+}
+
+function resetShellUI() {
+
+	stopShellAutoplay();
+	worlds.shell.reset();
+	shellSteps = IDLE_SHELL_STEPS;
+	shellIndex = 0;
+	updateShellStepUI();
+
+}
+
+function appendTermLine( text, className ) {
+
+	const line = document.createElement( 'div' );
+	line.className = className;
+	line.textContent = text;
+	shellOutputEl.appendChild( line );
+	shellOutputEl.scrollTop = shellOutputEl.scrollHeight;
+
+}
+
+function appendTermCommand( raw ) {
+
+	const line = document.createElement( 'div' );
+	line.className = 'term-line-cmd';
+	const prompt = document.createElement( 'span' );
+	prompt.className = 'term-prompt-inline';
+	prompt.textContent = 'guest@hurd ~$';
+	line.append( prompt, document.createTextNode( raw ) );
+	shellOutputEl.appendChild( line );
+	shellOutputEl.scrollTop = shellOutputEl.scrollHeight;
+
+}
+
+function runShellCommand( raw ) {
+
+	const trimmed = raw.trim();
+	if ( ! trimmed ) return;
+
+	appendTermCommand( trimmed );
+
+	if ( trimmed === 'clear' ) { shellOutputEl.innerHTML = ''; return; }
+
+	const parsed = parseShellInput( trimmed );
+	if ( ! parsed || ! parsed.spec ) {
+
+		const badCmd = parsed ? parsed.argv[ 0 ] : trimmed;
+		appendTermLine( `bash: ${ badCmd }: command not modeled — try: ls, cat, ps, whoami, ping, help`, 'term-line-err' );
+		return;
+
+	}
+
+	stopShellAutoplay();
+	const { spec, argv } = parsed;
+	worlds.shell.runCommand( spec.steps );
+	shellSteps = spec.steps;
+	shellIndex = 0;
+	updateShellStepUI();
+	flyCameraTo( worlds.shell.getStepView( 0 ), 0.9 );
+
+	shellAutoplayTimer = setInterval( () => {
+
+		if ( shellIndex >= shellSteps.length - 1 ) {
+
+			stopShellAutoplay();
+			appendTermLine( spec.respond( argv ), 'term-line-out' );
+			return;
+
+		}
+		goToShellStep( shellIndex + 1 );
+
+	}, 1100 );
+
+}
+
+shellForm.addEventListener( 'submit', ( event ) => {
+
+	event.preventDefault();
+	const value = shellInputEl.value;
+	shellInputEl.value = '';
+	runShellCommand( value );
+
+} );
+
+SHELL_COMMANDS.forEach( ( spec ) => {
+
+	const chip = document.createElement( 'button' );
+	chip.type = 'button';
+	chip.className = 'chip';
+	chip.textContent = spec.key;
+	chip.title = spec.hint;
+	chip.addEventListener( 'click', () => runShellCommand( spec.key ) );
+	shellChipsEl.appendChild( chip );
+
+} );
+
+updateShellStepUI();
 
 // ---------------------------------------------------------------- boot / loading
 
