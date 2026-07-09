@@ -13,7 +13,12 @@ import { buildComponentsWorld } from './worlds/components.js';
 import { buildBootWorld } from './worlds/boot.js';
 import { buildCompareWorld } from './worlds/compare.js';
 import { buildShellWorld } from './worlds/shell.js';
+import { buildTranslatorsWorld } from './worlds/translators.js';
+import { buildQemuWorld } from './worlds/qemu.js';
 import { SHELL_COMMANDS, parseShellInput } from './data/shellCommands.js';
+import { TRANSLATOR_OPTIONS } from './data/translators.js';
+import { getIpcExample } from './data/ipcExamples.js';
+import { QEMU_STEPS, QEMU_LINKS } from './data/qemuGuide.js';
 import { tween, tweenVec3, updateTweens, Easing } from './utils/tween.js';
 
 // ---------------------------------------------------------------- renderer
@@ -68,6 +73,8 @@ const worlds = {
 	boot: buildBootWorld(),
 	compare: buildCompareWorld(),
 	shell: buildShellWorld(),
+	translators: buildTranslatorsWorld(),
+	qemu: buildQemuWorld(),
 };
 
 let currentKey = 'overview';
@@ -156,7 +163,26 @@ const detailBlurb = document.getElementById( 'detail-blurb' );
 const detailDescription = document.getElementById( 'detail-description' );
 const detailResponsibilities = document.getElementById( 'detail-responsibilities' );
 const detailMonolithic = document.getElementById( 'detail-monolithic' );
+const detailIpcBlock = document.getElementById( 'detail-ipc-block' );
+const detailIpcRpc = document.getElementById( 'detail-ipc-rpc' );
+const detailIpcFrom = document.getElementById( 'detail-ipc-from' );
+const detailIpcRequest = document.getElementById( 'detail-ipc-request' );
+const detailIpcReply = document.getElementById( 'detail-ipc-reply' );
+const detailIpcNote = document.getElementById( 'detail-ipc-note' );
 document.getElementById( 'detail-close' ).addEventListener( 'click', closeDetail );
+
+function fillList( el, items ) {
+
+	el.innerHTML = '';
+	items.forEach( ( item ) => {
+
+		const li = document.createElement( 'li' );
+		li.textContent = item;
+		el.appendChild( li );
+
+	} );
+
+}
 
 function openDetail( id ) {
 
@@ -168,15 +194,20 @@ function openDetail( id ) {
 	detailName.textContent = comp.name;
 	detailBlurb.textContent = comp.blurb;
 	detailDescription.textContent = comp.description;
-	detailResponsibilities.innerHTML = '';
-	comp.responsibilities.forEach( ( r ) => {
-
-		const li = document.createElement( 'li' );
-		li.textContent = r;
-		detailResponsibilities.appendChild( li );
-
-	} );
+	fillList( detailResponsibilities, comp.responsibilities );
 	detailMonolithic.textContent = comp.monolithic;
+
+	const ipc = getIpcExample( id );
+	detailIpcBlock.classList.toggle( 'hidden', ! ipc );
+	if ( ipc ) {
+
+		detailIpcRpc.textContent = ipc.rpc;
+		detailIpcFrom.textContent = ipc.from;
+		fillList( detailIpcRequest, ipc.request );
+		fillList( detailIpcReply, ipc.reply );
+		detailIpcNote.textContent = ipc.note;
+
+	}
 
 	detailCard.classList.add( 'open' );
 	detailCard.setAttribute( 'aria-hidden', 'false' );
@@ -547,6 +578,150 @@ SHELL_COMMANDS.forEach( ( spec ) => {
 } );
 
 updateShellStepUI();
+
+// ---------------------------------------------------------------- translators
+
+const translatorChipsEl = document.getElementById( 'translator-chips' );
+const translatorCommandEl = document.getElementById( 'translator-command' );
+const translatorNoteEl = document.getElementById( 'translator-note' );
+const translatorAttachBtn = document.getElementById( 'translator-attach' );
+const translatorDetachBtn = document.getElementById( 'translator-detach' );
+
+let selectedTranslatorKey = null;
+
+function updateTranslatorButtons() {
+
+	const attachedKey = worlds.translators.getAttachedKey();
+	const busy = worlds.translators.isBusy();
+	translatorAttachBtn.disabled = busy || ! selectedTranslatorKey || selectedTranslatorKey === attachedKey;
+	translatorDetachBtn.disabled = busy || ! attachedKey;
+
+}
+
+worlds.translators.setOnChange( updateTranslatorButtons );
+
+TRANSLATOR_OPTIONS.forEach( ( option ) => {
+
+	const chip = document.createElement( 'button' );
+	chip.type = 'button';
+	chip.className = 'chip';
+	chip.innerHTML = `<span class="legend-dot" style="background:#${ CATEGORIES.filesystem.color.toString( 16 ).padStart( 6, '0' ) }"></span>${ option.label }`;
+	chip.addEventListener( 'click', () => {
+
+		selectedTranslatorKey = option.key;
+		translatorChipsEl.querySelectorAll( '.chip' ).forEach( ( c ) => c.classList.remove( 'active' ) );
+		chip.classList.add( 'active' );
+		translatorCommandEl.textContent = option.command;
+		translatorNoteEl.textContent = option.note;
+		updateTranslatorButtons();
+
+	} );
+	translatorChipsEl.appendChild( chip );
+
+} );
+
+translatorAttachBtn.addEventListener( 'click', () => {
+
+	if ( ! selectedTranslatorKey ) return;
+	worlds.translators.attach( selectedTranslatorKey );
+	updateTranslatorButtons();
+
+} );
+
+translatorDetachBtn.addEventListener( 'click', () => {
+
+	worlds.translators.detach();
+	selectedTranslatorKey = null;
+	translatorChipsEl.querySelectorAll( '.chip' ).forEach( ( c ) => c.classList.remove( 'active' ) );
+	translatorCommandEl.textContent = 'no translator attached';
+	translatorNoteEl.textContent = 'Pick a translator and click "Attach" to see it here.';
+	updateTranslatorButtons();
+
+} );
+
+updateTranslatorButtons();
+
+// ---------------------------------------------------------------- run it for real (qemu)
+
+function copyToClipboard( text, btn ) {
+
+	const restore = btn.textContent;
+	const onDone = ( label ) => { btn.textContent = label; setTimeout( () => { btn.textContent = restore; }, 1200 ); };
+
+	function legacyCopy() {
+
+		const textarea = document.createElement( 'textarea' );
+		textarea.value = text;
+		textarea.style.position = 'fixed';
+		textarea.style.opacity = '0';
+		document.body.appendChild( textarea );
+		textarea.select();
+		let ok = false;
+		try { ok = document.execCommand( 'copy' ); } catch ( e ) { ok = false; }
+		document.body.removeChild( textarea );
+		onDone( ok ? 'Copied' : 'Copy failed' );
+
+	}
+
+	if ( navigator.clipboard && navigator.clipboard.writeText ) {
+
+		navigator.clipboard.writeText( text ).then( () => onDone( 'Copied' ) ).catch( legacyCopy );
+
+	} else {
+
+		legacyCopy();
+
+	}
+
+}
+
+const qemuStepsEl = document.getElementById( 'qemu-steps' );
+QEMU_STEPS.forEach( ( step, i ) => {
+
+	const wrap = document.createElement( 'div' );
+	wrap.className = 'qemu-step';
+
+	const title = document.createElement( 'div' );
+	title.className = 'qemu-step-title';
+	title.innerHTML = `<span class="qemu-step-num">${ i + 1 }.</span> ${ step.title }`;
+	wrap.appendChild( title );
+
+	const desc = document.createElement( 'p' );
+	desc.className = 'qemu-step-desc';
+	desc.textContent = step.description;
+	wrap.appendChild( desc );
+
+	const row = document.createElement( 'div' );
+	row.className = 'qemu-step-cmd-row';
+
+	const cmd = document.createElement( 'pre' );
+	cmd.className = 'qemu-step-cmd';
+	cmd.textContent = step.command;
+	row.appendChild( cmd );
+
+	const copyBtn = document.createElement( 'button' );
+	copyBtn.type = 'button';
+	copyBtn.className = 'qemu-copy-btn';
+	copyBtn.textContent = 'Copy';
+	copyBtn.addEventListener( 'click', () => copyToClipboard( step.command, copyBtn ) );
+	row.appendChild( copyBtn );
+
+	wrap.appendChild( row );
+	qemuStepsEl.appendChild( wrap );
+
+} );
+
+const qemuLinksEl = document.getElementById( 'qemu-links' );
+QEMU_LINKS.forEach( ( link ) => {
+
+	const a = document.createElement( 'a' );
+	a.href = link.href;
+	a.target = '_blank';
+	a.rel = 'noopener';
+	a.textContent = link.label + ' ↗';
+	qemuLinksEl.appendChild( a );
+
+} );
 
 // ---------------------------------------------------------------- boot / loading
 

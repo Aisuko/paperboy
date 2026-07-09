@@ -38,8 +38,14 @@
 			<button class="nav-link" data-goto="shell">
 				<span class="nav-index">05</span>Run a command
 			</button>
+			<button class="nav-link" data-goto="translators">
+				<span class="nav-index">06</span>Translators
+			</button>
+			<button class="nav-link" data-goto="qemu">
+				<span class="nav-index">07</span>Run it for real
+			</button>
 		</nav>
-		<a class="nav-source" href="https://www.gnu.org/software/hurd/" target="_blank" rel="noopener">gnu.org/software/hurd ↗</a>
+		<a class="nav-source" href="../../">&larr; Home</a>
 	</header>
 
 	<!-- ============ 01 OVERVIEW ============ -->
@@ -145,6 +151,58 @@
 		</div>
 	</section>
 
+	<!-- ============ 06 TRANSLATORS ============ -->
+	<section class="world" data-world-panel="translators">
+		<div class="hud hud-top-left">
+			<div class="eyebrow">06 · Attach a filesystem anywhere</div>
+			<h1>One command,<br /><em>a brand-new filesystem.</em></h1>
+			<p class="lede">
+				<code>settrans</code> attaches an ordinary, unprivileged program to any node in
+				the namespace. From that moment, every lookup underneath it &mdash;
+				<code>ls</code>, <code>cat</code>, <code>open()</code> &mdash; is answered by
+				that program instead of whatever it's sitting in. No kernel changes, no root
+				required.
+			</p>
+			<div class="hint">Pick a translator below, attach it to /mnt, then detach it again.</div>
+		</div>
+		<div class="hud hud-top-right boot-step-card" id="translator-command-card">
+			<div class="boot-step-index">Equivalent shell command</div>
+			<pre id="translator-command" class="translator-command">no translator attached</pre>
+			<p id="translator-note">Pick a translator and click "Attach" to see it here.</p>
+		</div>
+		<div class="hud hud-bottom translator-controls" id="translator-controls">
+			<div class="category-chips" id="translator-chips"></div>
+			<div class="translator-actions">
+				<button id="translator-attach" class="compare-btn" disabled>Attach translator</button>
+				<button id="translator-detach" class="compare-btn translator-btn-detach" disabled>Detach (settrans -g)</button>
+			</div>
+		</div>
+	</section>
+
+	<!-- ============ 07 RUN IT FOR REAL ============ -->
+	<section class="world" data-world-panel="qemu">
+		<div class="hud hud-top-left">
+			<div class="eyebrow">07 · Take it further</div>
+			<h1>Run the real thing<br /><em>in QEMU.</em></h1>
+			<p class="lede">
+				Everything on this site is a simplified, animated model. The Hurd itself is
+				real, free software you can boot today &mdash; no special hardware, just an
+				emulator.
+			</p>
+		</div>
+		<div class="hud hud-bottom qemu-panel" id="qemu-panel">
+			<div class="qemu-steps" id="qemu-steps"></div>
+			<div class="qemu-links" id="qemu-links"></div>
+			<p class="qemu-caveat">
+				This site doesn't embed a live Hurd boot &mdash; a real one needs a
+				multi-hundred-megabyte disk image, and the Hurd itself is still
+				experimental (expect the odd crash). Projects like
+				<a href="https://github.com/copy/v86" target="_blank" rel="noopener">v86</a>
+				run kernels directly in the browser if you'd rather try that route instead.
+			</p>
+		</div>
+	</section>
+
 	<!-- ============ shared component detail card ============ -->
 	<aside id="detail-card" class="detail-card" aria-hidden="true">
 		<button id="detail-close" class="detail-close" aria-label="Close">&times;</button>
@@ -159,6 +217,22 @@
 		<div class="detail-block detail-mono">
 			<h4>On a monolithic kernel</h4>
 			<p id="detail-monolithic"></p>
+		</div>
+		<div class="detail-block detail-block-ipc" id="detail-ipc-block">
+			<h4>Example RPC</h4>
+			<div class="detail-rpc-name" id="detail-ipc-rpc"></div>
+			<div class="detail-rpc-from" id="detail-ipc-from"></div>
+			<div class="detail-rpc-fields">
+				<div>
+					<span class="detail-rpc-label">Request</span>
+					<ul id="detail-ipc-request"></ul>
+				</div>
+				<div>
+					<span class="detail-rpc-label">Reply</span>
+					<ul id="detail-ipc-reply"></ul>
+				</div>
+			</div>
+			<p id="detail-ipc-note"></p>
 		</div>
 	</aside>
 

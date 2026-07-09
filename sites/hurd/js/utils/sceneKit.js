@@ -43,6 +43,35 @@ export function createStarfield( count = 900, radius = 60 ) {
 
 }
 
+// Disposes a component/label group built by createComponentObject (or any
+// THREE.Group of meshes/CSS2DObjects) and detaches it from its parent.
+export function disposeObject3D( obj ) {
+
+	obj.traverse( ( child ) => {
+
+		if ( child.geometry ) child.geometry.dispose();
+		if ( child.material ) {
+
+			const mats = Array.isArray( child.material ) ? child.material : [ child.material ];
+			mats.forEach( ( m ) => m.dispose() );
+
+		}
+		if ( child.isCSS2DObject && child.element && child.element.parentNode ) child.element.parentNode.removeChild( child.element );
+
+	} );
+	if ( obj.parent ) obj.parent.remove( obj );
+
+}
+
+// Disposes an IPCLink's tube + particle meshes and detaches them.
+export function disposeLink( link ) {
+
+	link.dispose();
+	if ( link.tube.parent ) link.tube.parent.remove( link.tube );
+	link.particles.forEach( ( p ) => { if ( p.parent ) p.parent.remove( p ); } );
+
+}
+
 export function createFloor( radius = 14, color = 0x11111a ) {
 
 	const geo = new THREE.CircleGeometry( radius, 64 );
