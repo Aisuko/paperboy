@@ -60,30 +60,7 @@ Compare that to how a lot of "open" AI work happens in 2026: weights you can dow
 
 The Hurd's rule — *AI may look, a human must write and sign off* — is a small, deliberate act of keeping authorship where the four freedoms put it. That's the real distinction I was missing when I first framed this as "AI agents will help the Hurd." The interesting part was never whether AI *can* help. It's who stays accountable for the result.
 
-## 04 &middot; What's actually in this repo
-
-| Path | What it is |
-|---|---|
-| [`index.html`](index.html) | Landing page for the project(s) hosted here |
-| [`sites/hurd/`](sites/hurd/) | The 3D GNU Hurd field guide — microkernel, components, boot sequence, monolithic-vs-micro comparison ([live](https://aisuko.github.io/paperboy/sites/hurd/)) |
-| [`references/three.js/`](references/three.js/) | Vendored three.js source + examples, used as a reference while building the scenes |
-| [`references/transformer-explainer/`](references/transformer-explainer/) | Reference for the "make the process transparent, start to end" interaction style |
-| [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml) | Publishes `index.html` + `sites/` to GitHub Pages on every push to `main` |
-
-> Note on process: the `sites/hurd` scenes in this repo were built with an AI coding agent (Claude Code) writing the code — the opposite of the Hurd's own rule above. That's on purpose: this repo is a demo/teaching site *about* the Hurd, not a patch submitted *to* it. The distinction in section 03 is exactly why those two things are allowed to be held to different standards.
-
-## 05 &middot; Run it locally
-
-No build step — it's static HTML/CSS/three.js.
-
-```bash
-git clone https://github.com/Aisuko/paperboy.git
-cd paperboy
-python3 -m http.server 8000
-# then open http://localhost:8000
-```
-
-## 06 &middot; Further reading
+## 04 &middot; Further reading
 
 - [GNU Hurd — official project page](https://www.gnu.org/software/hurd/)
 - [GNU Hurd — Wikipedia](https://en.wikipedia.org/wiki/GNU_Hurd)

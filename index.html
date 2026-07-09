@@ -13,7 +13,10 @@
 
 	<aside id="sidebar">
 		<div class="brand">
-			<a href="#top" class="brand-mark">paperboy</a>
+			<div class="brand-row">
+				<a href="#top" class="brand-mark">paperboy</a>
+				<span class="brand-badge">v0.1</span>
+			</div>
 			<span class="brand-tag">3D field guides</span>
 		</div>
 
@@ -76,49 +79,73 @@
 		<section id="projects" class="projects">
 			<div class="section-head">
 				<span class="section-index">01</span>
-				<h2>Projects</h2>
-				<p>One live field guide so far, more on the way.</p>
+				<h2>Field guides</h2>
+				<p>Interactive 3D explainers for systems that are usually just diagrams and manpages.</p>
 			</div>
 
-			<a class="showcase-card" href="sites/hurd/">
-				<div class="showcase-visual">
-					<svg class="node-graph" viewBox="0 0 400 260" aria-hidden="true">
-						<g class="ng-edges" stroke="currentColor" fill="none">
-							<line x1="200" y1="130" x2="90" y2="60" />
-							<line x1="200" y1="130" x2="310" y2="55" />
-							<line x1="200" y1="130" x2="70" y2="180" />
-							<line x1="200" y1="130" x2="200" y2="220" />
-							<line x1="200" y1="130" x2="330" y2="190" />
-							<line x1="90" y1="60" x2="200" y2="30" />
-							<line x1="310" y1="55" x2="200" y2="30" />
-						</g>
-						<g class="ng-nodes">
-							<circle cx="200" cy="130" r="10" class="ng-core" />
-							<circle cx="90" cy="60" r="6" />
-							<circle cx="310" cy="55" r="6" />
-							<circle cx="70" cy="180" r="6" />
-							<circle cx="200" cy="220" r="6" />
-							<circle cx="330" cy="190" r="6" />
-							<circle cx="200" cy="30" r="5" />
-						</g>
-					</svg>
-					<span class="showcase-badge">live 3D tour</span>
-				</div>
-				<div class="showcase-body">
-					<div class="showcase-kicker">Microkernel &middot; components &middot; boot sequence</div>
-					<h3>GNU / Hurd <span class="arrow">&rarr;</span></h3>
-					<p>
-						An interactive tour of the Hurd's multiserver microkernel: its servers
-						and translators, its boot sequence, and how it compares to a
-						monolithic kernel. Drag to orbit, click any module for detail.
-					</p>
-					<div class="showcase-tags">
-						<span>three.js</span>
-						<span>WebGL</span>
-						<span>GNU Mach</span>
+			<div class="gallery-grid">
+				<a class="gallery-tile gallery-tile--featured" href="sites/hurd/" data-tilt>
+					<div class="gallery-visual">
+						<svg class="node-graph" viewBox="0 0 400 260" aria-hidden="true">
+							<g class="ng-edges" stroke="currentColor" fill="none">
+								<line x1="200" y1="130" x2="90" y2="60" />
+								<line x1="200" y1="130" x2="310" y2="55" />
+								<line x1="200" y1="130" x2="70" y2="180" />
+								<line x1="200" y1="130" x2="200" y2="220" />
+								<line x1="200" y1="130" x2="330" y2="190" />
+								<line x1="90" y1="60" x2="200" y2="30" />
+								<line x1="310" y1="55" x2="200" y2="30" />
+							</g>
+							<g class="ng-nodes">
+								<circle cx="200" cy="130" r="10" class="ng-core" />
+								<circle cx="90" cy="60" r="6" />
+								<circle cx="310" cy="55" r="6" />
+								<circle cx="70" cy="180" r="6" />
+								<circle cx="200" cy="220" r="6" />
+								<circle cx="330" cy="190" r="6" />
+								<circle cx="200" cy="30" r="5" />
+							</g>
+						</svg>
+						<span class="gallery-badge">live &middot; 3D tour</span>
+					</div>
+					<div class="gallery-body">
+						<div class="gallery-kicker">Microkernel &middot; components &middot; boot sequence</div>
+						<h3>GNU / Hurd <span class="arrow">&rarr;</span></h3>
+						<p>
+							An interactive tour of the Hurd's multiserver microkernel: its servers
+							and translators, its boot sequence, and how it compares to a
+							monolithic kernel. Drag to orbit, click any module for detail.
+						</p>
+						<div class="gallery-tags">
+							<span>three.js</span>
+							<span>WebGL</span>
+							<span>GNU Mach</span>
+						</div>
+					</div>
+				</a>
+
+				<div class="gallery-tile gallery-tile--soon" data-tilt>
+					<div class="gallery-visual gallery-visual--soon">
+						<span class="soon-icon">&#43;</span>
+					</div>
+					<div class="gallery-body">
+						<div class="gallery-kicker">In progress</div>
+						<h3>Next field guide</h3>
+						<p>More systems, same treatment &mdash; drag to orbit, click to learn.</p>
 					</div>
 				</div>
-			</a>
+
+				<div class="gallery-tile gallery-tile--soon" data-tilt>
+					<div class="gallery-visual gallery-visual--soon">
+						<span class="soon-icon">?</span>
+					</div>
+					<div class="gallery-body">
+						<div class="gallery-kicker">Got a system in mind</div>
+						<h3>Suggest one</h3>
+						<p><a href="https://github.com/Aisuko/paperboy/issues" target="_blank" rel="noopener">Open an issue &#8599;</a></p>
+					</div>
+				</div>
+			</div>
 		</section>
 
 		<section id="about" class="about">
@@ -160,6 +187,7 @@
 		}
 	</script>
 	<script type="module" src="js/hero-scene.js"></script>
+	<script type="module" src="js/gallery-tilt.js"></script>
 
 </body>
 </html>

@@ -35,6 +35,9 @@
 			<button class="nav-link" data-goto="compare">
 				<span class="nav-index">04</span>Compare
 			</button>
+			<button class="nav-link" data-goto="shell">
+				<span class="nav-index">05</span>Run a command
+			</button>
 		</nav>
 		<a class="nav-source" href="https://www.gnu.org/software/hurd/" target="_blank" rel="noopener">gnu.org/software/hurd ↗</a>
 	</header>
@@ -114,6 +117,32 @@
 		<div class="hud hud-label hud-label-left">MONOLITHIC</div>
 		<div class="hud hud-label hud-label-mid">MICROKERNEL (HURD)</div>
 		<div class="hud hud-label hud-label-right">HYBRID</div>
+	</section>
+
+	<!-- ============ 05 RUN A COMMAND ============ -->
+	<section class="world" data-world-panel="shell">
+		<div class="hud hud-top-left">
+			<div class="eyebrow">05 · Watch a command run</div>
+			<h1>Type a command,<br /><em>watch it ripple through the servers.</em></h1>
+			<p class="lede">
+				Every shell command is a new Mach task, forked and exec'd, that spends its
+				short life sending IPC messages to a handful of Hurd servers before
+				printing a reply. Type one below and watch the trace, one hop at a time.
+			</p>
+		</div>
+		<div class="hud hud-top-right boot-step-card" id="shell-step-card">
+			<div class="boot-step-index">Step <span id="shell-step-num">1</span> / <span id="shell-step-total">1</span></div>
+			<h2 id="shell-step-title">Waiting for input</h2>
+			<p id="shell-step-desc">Type a command into the terminal below and press Enter.</p>
+		</div>
+		<div class="hud hud-bottom shell-terminal" id="shell-terminal">
+			<div class="term-output" id="shell-output"></div>
+			<form id="shell-form" class="term-inputline" autocomplete="off">
+				<span class="term-prompt">guest@hurd&nbsp;~$</span>
+				<input id="shell-input" class="term-input" type="text" autocomplete="off" spellcheck="false" placeholder="try: ls, cat /etc/motd, ps, whoami, ping gnu.org, help" />
+			</form>
+			<div class="term-chips" id="shell-chips"></div>
+		</div>
 	</section>
 
 	<!-- ============ shared component detail card ============ -->
