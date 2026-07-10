@@ -50,8 +50,67 @@ export const MOCK_ATTENTION_MATRIX = [
 	0.15, 0.10, 0.25, 0.20, 0.30,
 ];
 
+// Multi-head mock data: deterministic per-head variants of
+// MOCK_ATTENTION_MATRIX (seeded jitter, not Math.random()) that preserve the
+// causal zero-mask (row i only nonzero for cols <= i) and renormalise each
+// row to sum to 1 — illustrative only, not a real trained model's weights.
+// GPT-2 small uses 12 attention heads per block.
+export const HEAD_COUNT = 12;
+
+function seededJitter( seed ) {
+
+	const x = Math.sin( seed * 12.9898 ) * 43758.5453;
+	return x - Math.floor( x );
+
+}
+
+function jitterCausalMatrix( base, headIndex ) {
+
+	const cols = 5;
+	const rows = Math.ceil( base.length / cols );
+	const out = base.slice();
+
+	for ( let r = 0; r < rows; r ++ ) {
+
+		const nonzero = [];
+		for ( let c = 0; c <= r; c ++ ) nonzero.push( r * cols + c );
+
+		let sum = 0;
+		nonzero.forEach( ( idx, k ) => {
+
+			const jitter = 0.7 + seededJitter( headIndex * 97 + idx * 13 + k ) * 0.6;
+			out[ idx ] = base[ idx ] * jitter;
+			sum += out[ idx ];
+
+		} );
+
+		nonzero.forEach( ( idx ) => { out[ idx ] = sum > 0 ? out[ idx ] / sum : 0; } );
+
+	}
+
+	return out;
+
+}
+
+export const HEAD_MATRICES = Array.from( { length: HEAD_COUNT }, ( _, h ) => jitterCausalMatrix( MOCK_ATTENTION_MATRIX, h ) );
+
+// Small deterministic per-head "strength" scalar, used to vary ribbon width
+// on head switch without rebuilding geometry.
+export const HEAD_STRENGTH = Array.from( { length: HEAD_COUNT }, ( _, h ) => 0.8 + seededJitter( h * 31 + 5 ) * 0.4 );
+
 export const SCALING_NOTE = {
 	title: 'Why divide by sqrt(d_k)?',
 	lines: [ 'q . k = sum_{t=1}^{d_k} (q_t k_t)', 'Var(q . k) is proportional to d_k' ],
 	copy: 'Without scaling, larger head dimensions produce larger dot-product magnitudes, so softmax becomes too sharp — e.g. [100, 2, 1] -> [1, 0, 0] — causing tiny gradients and unstable training.',
+};
+
+// Naive-recompute vs KV-cache framing for Q/K/V compute cost, shown while
+// steps 1-2 (Q/K/V + attention-weight compute) are on screen. K and V for
+// past tokens don't change once written, so a real decoder caches them
+// instead of recomputing K/V for every earlier token on every generation
+// step — this is the concrete "self-attention is expensive" point.
+export const KV_CACHE_NOTE = {
+	title: 'Recomputing K/V is wasteful',
+	copy: 'Naively, generating each new token recomputes K and V for every earlier token too — O(n) work per step, O(n^2) over a full generation. A KV cache stores each token\'s K/V once and reuses them, so only the newest token needs fresh K/V.',
+	opsLabel: ( n ) => ( { naive: ( n * ( n + 1 ) ) / 2, cache: n } ),
 };

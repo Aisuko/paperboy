@@ -4,7 +4,7 @@
 	<meta charset="utf-8" />
 	<title>Cortex — an interactive 3D tour of a decoder-only Transformer</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-	<meta name="description" content="An interactive 3D explainer of a decoder-only Transformer: tokenization, embeddings, the transformer block, multi-head self-attention, decoding, and training vs. inference." />
+	<meta name="description" content="An interactive 3D explainer of a decoder-only Transformer: tokenisation, embeddings, the transformer block, multi-head self-attention, decoding, and training vs. inference." />
 	<link rel="stylesheet" href="css/main.css" />
 </head>
 <body data-world="tokenize">
@@ -24,7 +24,7 @@
 		</div>
 		<nav class="nav-links">
 			<button class="nav-link" data-goto="tokenize">
-				<span class="nav-index">01</span>Tokenize
+				<span class="nav-index">01</span>Tokenise
 			</button>
 			<button class="nav-link" data-goto="block">
 				<span class="nav-index">02</span>Block
@@ -45,15 +45,16 @@
 		<a class="nav-source" href="../../">&larr; Home</a>
 	</header>
 
-	<!-- ============ 01 TOKENIZE & EMBED ============ -->
+	<!-- ============ 01 TOKENISE & EMBED ============ -->
 	<section class="world" data-world-panel="tokenize">
 		<div class="hud hud-top-left">
 			<div class="eyebrow">01 · From text to vectors</div>
 			<h1>Words become<br /><em>numbers.</em></h1>
 			<p class="lede">
 				<code>"How the weather today?"</code> is split into tokens, each token maps to an
-				integer ID, and each ID indexes into an embedding matrix — a continuous vector the
-				transformer can actually compute with.
+				integer ID, and each ID indexes into an embedding matrix — a continuous, 768-dimensional
+				vector the transformer can actually compute with. The scatter below projects that
+				768d space down to 3 dimensions so nearby meanings can be seen as nearby points.
 			</p>
 			<div class="hint">Drag to orbit &middot; scroll to zoom &middot; click a token</div>
 		</div>
@@ -68,7 +69,7 @@
 		</div>
 		<div class="hud hud-top-right step-card" id="block-step-card">
 			<div class="step-card-index">Stage <span id="block-step-num">1</span> / <span id="block-step-total">6</span></div>
-			<h2 id="block-step-title">RMSNorm</h2>
+			<h2 id="block-step-title">LayerNorm</h2>
 			<p id="block-step-desc"></p>
 		</div>
 		<div class="hud hud-bottom scrubber">
@@ -97,6 +98,14 @@
 			<p id="attn-step-desc"></p>
 			<pre id="attn-step-equations"></pre>
 		</div>
+		<div class="hud hud-bottom-left category-chips" id="attn-head-chips"></div>
+		<div class="hud hud-bottom-right step-card" id="attn-kv-panel">
+			<div class="step-card-index">Compute mode</div>
+			<h2>Recomputing K/V is wasteful</h2>
+			<p id="attn-kv-copy"></p>
+			<div class="category-chips" id="attn-kv-chips" style="justify-content:flex-start; margin-top:10px;"></div>
+			<p class="sample-note" id="attn-kv-ops"></p>
+		</div>
 		<div class="hud hud-bottom scrubber">
 			<button id="attn-prev" class="scrubber-btn" aria-label="Previous step">
 				<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 4 8l6 5"/></svg>
@@ -118,8 +127,10 @@
 			<h1>Logits become<br />a probability.</h1>
 			<p class="lede">
 				<code>lm_head</code> projects the final hidden state into one logit per vocabulary
-				token, then softmax turns those logits into probabilities that sum to 1.
+				token — 50,257 of them — then softmax turns those logits into probabilities that
+				sum to 1. Shown here: the top 5 candidates.
 			</p>
+			<div class="hint">The softmax curve is an illustrative squashing shape — real softmax is computed jointly over the whole vocabulary, not point-by-point.</div>
 		</div>
 		<div class="hud hud-bottom-left category-chips" id="decode-stage-chips"></div>
 		<div class="hud hud-bottom category-chips" id="decode-sample-chips"></div>

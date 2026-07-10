@@ -1,11 +1,29 @@
 import * as THREE from 'three';
 import { TOKENS } from '../data/tokens.js';
-import { addStandardLighting, createStarfield, createFloor, createOrbNode, createLabel } from '../utils/sceneKit.js';
+import { addStandardLighting, createStarfield, createFloor, createOrbNode, createLabel, createAxisFrame } from '../utils/sceneKit.js';
 import { IPCLink } from '../utils/ipcLink.js';
+import { tween } from '../utils/tween.js';
 
 const SPACING = 1.6;
 const TOKEN_COLOR = 0x8b7bff;
 const EMBED_COLOR = 0x35d0ba;
+const NEIGHBOUR_COLOR = 0xff5da2;
+
+// Cosine similarity between two equal-length mock embedding vectors —
+// illustrative only (real GPT-2 embeddings are 768d; these are 4d stand-ins).
+function cosineSimilarity( a, b ) {
+
+	let dot = 0, na = 0, nb = 0;
+	for ( let i = 0; i < a.length; i ++ ) {
+
+		dot += a[ i ] * b[ i ];
+		na += a[ i ] * a[ i ];
+		nb += b[ i ] * b[ i ];
+
+	}
+	return na && nb ? dot / ( Math.sqrt( na ) * Math.sqrt( nb ) ) : 0;
+
+}
 
 export function buildTokenizeWorld() {
 
@@ -57,11 +75,52 @@ export function buildTokenizeWorld() {
 	embedLabel.position.set( 0, -1.6, 0 );
 	rig.add( embedLabel );
 
+	// Nearest-neighbour lines: for each token, connect it to whichever other
+	// token its mock embedding is most cosine-similar to — a cheap stand-in
+	// for the semantic clustering that shows up in a real 768d embedding
+	// space once projected down to 3 dimensions.
+	const simLines = [];
+	TOKENS.forEach( ( token, i ) => {
+
+		let bestJ = -1, bestSim = -Infinity;
+		TOKENS.forEach( ( other, j ) => {
+
+			if ( i === j ) return;
+			const sim = cosineSimilarity( token.embedding, other.embedding );
+			if ( sim > bestSim ) { bestSim = sim; bestJ = j; }
+
+		} );
+		if ( bestJ === -1 ) return;
+
+		const geo = new THREE.BufferGeometry().setFromPoints( [ points[ i ].position.clone(), points[ bestJ ].position.clone() ] );
+		const mat = new THREE.LineBasicMaterial( { color: NEIGHBOUR_COLOR, transparent: true, opacity: 0 } );
+		const line = new THREE.Line( geo, mat );
+		line.userData.targetOpacity = 0.2 + Math.max( 0, bestSim ) * 0.5;
+		rig.add( line );
+		simLines.push( line );
+
+	} );
+
+	// Small axes legend near the cluster, reminding viewers this 3D scatter
+	// is a projection of a much higher-dimensional (768d) space.
+	const axisFrame = createAxisFrame( { size: 1.5, labels: [ 'dim 1 (projected)', 'dim 2 (projected)', 'dim 3 (projected)' ] } );
+	axisFrame.position.set( 0, -1.85, 1.3 );
+	axisFrame.traverse( ( obj ) => {
+
+		if ( ! obj.material ) return;
+		obj.material.userData.baseOpacity = obj.material.opacity;
+		obj.material.opacity = 0;
+
+	} );
+	rig.add( axisFrame );
+
 	let stage = 0;
 
 	function showStage( index ) {
 
 		stage = index;
+		const showNeighbours = stage === 2;
+
 		chips.forEach( ( chip ) => {
 
 			chip.material.emissiveIntensity = stage === 0 ? 1.6 : 0.5;
@@ -69,8 +128,25 @@ export function buildTokenizeWorld() {
 		} );
 		points.forEach( ( point ) => {
 
-			point.material.emissiveIntensity = stage === 1 ? 1.8 : 0.6;
+			point.material.emissiveIntensity = stage === 1 ? 1.8 : ( showNeighbours ? 1.1 : 0.6 );
 			point.scale.setScalar( stage === 1 ? 1.25 : 1 );
+
+		} );
+
+		simLines.forEach( ( line ) => {
+
+			const from = line.material.opacity;
+			const to = showNeighbours ? line.userData.targetOpacity : 0;
+			tween( 0.5, ( t ) => { line.material.opacity = THREE.MathUtils.lerp( from, to, t ); } );
+
+		} );
+
+		axisFrame.traverse( ( obj ) => {
+
+			if ( ! obj.material ) return;
+			const from = obj.material.opacity;
+			const to = showNeighbours ? obj.material.userData.baseOpacity : 0;
+			tween( 0.5, ( t ) => { obj.material.opacity = THREE.MathUtils.lerp( from, to, t ); } );
 
 		} );
 

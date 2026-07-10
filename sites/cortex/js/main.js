@@ -10,7 +10,8 @@ import { buildDecodeWorld } from './worlds/decode.js';
 import { buildTrainWorld } from './worlds/train.js';
 import { buildGlossaryWorld } from './worlds/glossary.js';
 import { BLOCK_STAGES } from './data/blockStages.js';
-import { ATTENTION_STEPS } from './data/attentionSteps.js';
+import { ATTENTION_STEPS, HEAD_COUNT, KV_CACHE_NOTE } from './data/attentionSteps.js';
+import { TOKENS } from './data/tokens.js';
 import { SAMPLING_STRATEGIES, SCORE_TABLE } from './data/vocab.js';
 
 // ---------------------------------------------------------------- renderer
@@ -241,7 +242,7 @@ renderer.domElement.addEventListener( 'click', ( event ) => {
 // ---------------------------------------------------------------- 01 tokenize stage chips
 
 const tokenizeChipsEl = document.getElementById( 'tokenize-chips' );
-[ '1. Tokens', '2. Embeddings' ].forEach( ( label, i ) => {
+[ '1. Tokens', '2. Embeddings', '3. Neighbours' ].forEach( ( label, i ) => {
 
 	const chip = document.createElement( 'button' );
 	chip.type = 'button';
@@ -362,6 +363,10 @@ const attnStepEquations = document.getElementById( 'attn-step-equations' );
 const attnPrev = document.getElementById( 'attn-prev' );
 const attnNext = document.getElementById( 'attn-next' );
 const attnPlay = document.getElementById( 'attn-play' );
+const attnKvPanel = document.getElementById( 'attn-kv-panel' );
+const attnKvCopy = document.getElementById( 'attn-kv-copy' );
+const attnKvOps = document.getElementById( 'attn-kv-ops' );
+const attnKvChipsEl = document.getElementById( 'attn-kv-chips' );
 
 let attnIndex = 0;
 let attnAutoplayTimer = null;
@@ -399,6 +404,8 @@ function updateAttnUI() {
 
 	} );
 
+	attnKvPanel.style.display = attnIndex <= 1 ? '' : 'none';
+
 }
 
 function goToAttnStep( index ) {
@@ -415,6 +422,11 @@ function resetAttnUI() {
 	buildAttnTrack();
 	attnIndex = 0;
 	worlds.attention.goToStep( 0 );
+	worlds.attention.setHead( 0 );
+	worlds.attention.setComputeMode( 'naive' );
+	attnHeadChipsEl.querySelectorAll( '.chip' ).forEach( ( c, i ) => c.classList.toggle( 'active', i === 0 ) );
+	attnKvChipsEl.querySelectorAll( '.chip' ).forEach( ( c, i ) => c.classList.toggle( 'active', i === 0 ) );
+	updateKvOpsReadout( 'naive' );
 	updateAttnUI();
 
 }
@@ -443,6 +455,60 @@ attnPlay.addEventListener( 'click', () => {
 
 buildAttnTrack();
 updateAttnUI();
+
+// ---------------------------------------------------------------- 03 attention head selector
+
+const attnHeadChipsEl = document.getElementById( 'attn-head-chips' );
+for ( let h = 0; h < HEAD_COUNT; h ++ ) {
+
+	const chip = document.createElement( 'button' );
+	chip.type = 'button';
+	chip.className = 'chip' + ( h === 0 ? ' active' : '' );
+	chip.textContent = `Head ${ h + 1 }`;
+	chip.addEventListener( 'click', () => {
+
+		attnHeadChipsEl.querySelectorAll( '.chip' ).forEach( ( c ) => c.classList.remove( 'active' ) );
+		chip.classList.add( 'active' );
+		worlds.attention.setHead( h );
+
+	} );
+	attnHeadChipsEl.appendChild( chip );
+
+}
+
+// ---------------------------------------------------------------- 03 attention KV-cache toggle
+
+attnKvCopy.textContent = KV_CACHE_NOTE.copy;
+
+const kvOps = KV_CACHE_NOTE.opsLabel( TOKENS.length );
+
+function updateKvOpsReadout( mode ) {
+
+	attnKvOps.textContent = mode === 'cache'
+		? `KV cache: ~${ kvOps.cache } K/V compute(s) for ${ TOKENS.length } tokens.`
+		: `Naive recompute: ~${ kvOps.naive } K/V compute(s) for ${ TOKENS.length } tokens.`;
+
+}
+
+[ [ 'naive', 'Naive recompute' ], [ 'cache', 'KV cache' ] ].forEach( ( [ mode, label ], i ) => {
+
+	const chip = document.createElement( 'button' );
+	chip.type = 'button';
+	chip.className = 'chip' + ( i === 0 ? ' active' : '' );
+	chip.textContent = label;
+	chip.addEventListener( 'click', () => {
+
+		attnKvChipsEl.querySelectorAll( '.chip' ).forEach( ( c ) => c.classList.remove( 'active' ) );
+		chip.classList.add( 'active' );
+		worlds.attention.setComputeMode( mode );
+		updateKvOpsReadout( mode );
+
+	} );
+	attnKvChipsEl.appendChild( chip );
+
+} );
+
+updateKvOpsReadout( 'naive' );
 
 // ---------------------------------------------------------------- 04 decode chips
 

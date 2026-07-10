@@ -51,7 +51,7 @@ export function buildTrainWorld() {
 		category: 'Training target',
 		name: NLL_EXAMPLE.trainingTargetToken,
 		blurb: `log P = ${ NLL_EXAMPLE.logProb } · NLL = -log P = ${ NLL_EXAMPLE.nll }`,
-		description: 'Lower NLL means the model assigns higher probability to the correct next token — exactly what training optimizes for.',
+		description: 'Lower NLL means the model assigns higher probability to the correct next token — exactly what training optimises for.',
 	};
 
 	let played = false;

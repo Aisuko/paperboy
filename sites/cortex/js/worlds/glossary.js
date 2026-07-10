@@ -4,7 +4,7 @@ import { addStandardLighting, createStarfield, createFloor, createOrbNode, creat
 import { IPCLink } from '../utils/ipcLink.js';
 
 const WORLD_NAMES = {
-	tokenize: 'Tokenize & Embed',
+	tokenize: 'Tokenise & Embed',
 	block: 'Transformer Block',
 	attention: 'Self-Attention Deep-Dive',
 	decode: 'lm_head -> Softmax',
