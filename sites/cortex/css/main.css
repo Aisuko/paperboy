@@ -135,6 +135,7 @@ body[data-world="glossary"] .world[data-world-panel="glossary"] {
 .hud-top-left { top: 108px; left: 28px; max-width: 480px; }
 .hud-top-right { top: 108px; right: 28px; max-width: 340px; }
 .hud-bottom-left { bottom: 28px; left: 28px; }
+.hud-bottom-right { bottom: 108px; right: 28px; }
 .hud-bottom { bottom: 28px; left: 50%; transform: translateX(-50%); }
 
 .eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
@@ -151,6 +152,11 @@ body[data-world="glossary"] .world[data-world-panel="glossary"] {
 
 /* chips (decoding-strategy picker, glossary filters, etc.) */
 .category-chips { display: flex; gap: 8px; flex-wrap: wrap; max-width: 90vw; justify-content: center; }
+
+/* 03 Attention has both a head-count row and a step scrubber sharing the
+   bottom edge — lift the head row clear of the scrubber so a full 12-head
+   GPT-2 row doesn't overlap the play/scrub controls. */
+#attn-head-chips { bottom: 96px; max-width: min(920px, 88vw); justify-content: flex-start; }
 .chip {
 	font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.03em; color: var(--ink-dim);
 	background: var(--panel-bg); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px;

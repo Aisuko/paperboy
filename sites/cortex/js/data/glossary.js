@@ -5,8 +5,8 @@ export const GLOSSARY = [
 	{
 		id: 'token',
 		term: 'Token',
-		blurb: 'A model-recognized unit of text with a unique integer ID.',
-		description: 'Tokenization splits text into model units (words or sub-words) and assigns each unit a unique integer ID. Modern LLM tokenizers commonly use subword schemes such as BPE. More tokens in the input/output sequence generally means more compute.',
+		blurb: 'A model-recognised unit of text with a unique integer ID.',
+		description: 'Tokenisation splits text into model units (words or sub-words) and assigns each unit a unique integer ID. Modern LLM tokenisers commonly use subword schemes such as BPE. More tokens in the input/output sequence generally means more compute.',
 		jump: 'tokenize',
 	},
 	{
@@ -33,8 +33,8 @@ export const GLOSSARY = [
 	{
 		id: 'softmax',
 		term: 'Softmax',
-		blurb: 'Normalizes logits into probabilities that sum to 1.',
-		description: 'Softmax exponentiates and normalizes logits so probabilities sum to 1 across the vocabulary. By contrast, sigmoid gives a single probability for binary tasks, and ReLU is a hidden-layer activation that does not output probabilities.',
+		blurb: 'Normalises logits into probabilities that sum to 1.',
+		description: 'Softmax exponentiates and normalises logits so probabilities sum to 1 across the vocabulary. By contrast, sigmoid gives a single probability for binary tasks, and ReLU is a hidden-layer activation that does not output probabilities.',
 		jump: 'decode',
 	},
 	{

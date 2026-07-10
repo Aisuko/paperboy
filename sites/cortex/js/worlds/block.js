@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BLOCK_STAGES } from '../data/blockStages.js';
-import { addStandardLighting, createStarfield, createSlab, createLabel } from '../utils/sceneKit.js';
+import { addStandardLighting, createStarfield, createLabel } from '../utils/sceneKit.js';
+import { createStageModule, setModuleState } from '../utils/blockModules.js';
 import { tween, Easing } from '../utils/tween.js';
 
 const TOP_Y = 2.0;
@@ -28,20 +29,26 @@ export function buildBlockWorld() {
 	scene.add( rig );
 
 	const nodes = [];
+	const allLinks = [];
 
 	BLOCK_STAGES.forEach( ( stage, i ) => {
 
 		const y = TOP_Y - i * SPACING;
-		const slab = createSlab( { width: 2.6, depth: 1.6, height: 0.2, color: STAGE_COLORS[ i ], opacity: 0.5 } );
-		slab.position.set( 0, y, 0 );
-		slab.userData.stepIndex = i;
-		rig.add( slab );
+		const mod = createStageModule( stage.type, {
+			scale: 1,
+			color: STAGE_COLORS[ i ],
+			accentColor: STAGE_COLORS[ ( i + 1 ) % STAGE_COLORS.length ],
+		} );
+		mod.position.set( 0, y, 0 );
+		mod.userData.stepIndex = i;
+		rig.add( mod );
 
 		const label = createLabel( `${ i + 1 }. ${ stage.title }`, 'label2d label2d-dim' );
 		label.position.set( 1.7, 0, 0 );
-		slab.add( label );
+		mod.add( label );
 
-		nodes.push( slab );
+		nodes.push( mod );
+		allLinks.push( ...mod.userData.links );
 
 	} );
 
@@ -68,8 +75,7 @@ export function buildBlockWorld() {
 				node.scale.set( s, 1, s );
 
 			}, { easing: Easing.backOut } );
-			node.material.opacity = active ? 0.85 : ( done ? 0.55 : 0.35 );
-			node.material.emissiveIntensity = active ? 0.7 : 0.3;
+			setModuleState( node, active ? 'active' : ( done ? 'done' : 'pending' ) );
 
 		} );
 
@@ -99,7 +105,11 @@ export function buildBlockWorld() {
 			highlight( Math.max( 0, Math.min( nodes.length - 1, index ) ) );
 
 		},
-		update() {},
+		update( dt ) {
+
+			for ( const link of allLinks ) link.update( dt );
+
+		},
 	};
 
 }

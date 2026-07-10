@@ -14,7 +14,7 @@ export const CORRECT_TOKEN_ID = 610;
 
 export const SAMPLING_STRATEGIES = [
 	{ key: 'greedy', label: 'Greedy / argmax', note: 'Choose probability 0.60 directly.', pickIds: [ 610 ] },
-	{ key: 'topk', label: 'Top-k (k=3)', note: 'Sample only from [0.60, 0.20, 0.10] after renormalization.', pickIds: [ 610, 233, 912 ] },
+	{ key: 'topk', label: 'Top-k (k=3)', note: 'Sample only from [0.60, 0.20, 0.10] after renormalisation.', pickIds: [ 610, 233, 912 ] },
 	{ key: 'topp', label: 'Top-p / nucleus (p=0.85)', note: 'Smallest cumulative set >= 0.85 is [0.60, 0.20, 0.10, ...], then sample.', pickIds: [ 610, 233, 912 ] },
 ];
 
