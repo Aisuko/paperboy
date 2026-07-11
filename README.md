@@ -20,7 +20,7 @@
 
 ## 01 &middot; Why this repo exists
 
-> I joined the [GNU Hurd project on Savannah](https://savannah.gnu.org/project/memberlist.php?group=hurd) back in **2021**. The learning curve was — and still is — brutal: a multiserver microkernel, GNU Mach, translators, capability-passing ports, decades of mailing-list history. I never shipped a patch(It's hard for me(GitHub generation) to use email to do the PR and it my problem of course).
+> I joined the [GNU Hurd project on Savannah](https://savannah.gnu.org/users/aisuko) back in **2021**. The learning curve was — and still is — brutal: a multiserver microkernel, GNU Mach, translators, capability-passing ports, decades of mailing-list history. I never shipped a patch(It's hard for me(GitHub generation) to use email to do the PR and it my problem of course).
 
 That gap is the reason this repository exists. [`sites/hurd`](sites/hurd/) is an interactive three.js explainer of the Hurd's microkernel core, its components, and its boot sequence — the field guide I wish I'd had in 2021, built so the next person doesn't bounce off the learning curve the way I did.
 
