@@ -15,7 +15,9 @@
 	"containerEnv": {
 		"NVIDIA_VISIBLE_DEVICES": "all",
 		"NVIDIA_DRIVER_CAPABILITIES": "compute,utility"
-	}
+	},
+
+	"shutdownAction": "stopContainer"
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
