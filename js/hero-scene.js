@@ -8,7 +8,7 @@ const container = document.getElementById( 'hero-webgl' );
 const reduceMotion = window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2( 0x06060a, 0.05 );
+scene.fog = new THREE.FogExp2( 0x07090b, 0.05 );
 
 const camera = new THREE.PerspectiveCamera( 55, window.innerWidth / window.innerHeight, 0.1, 100 );
 camera.position.set( 0, 0.6, 9 );
@@ -67,11 +67,11 @@ function createDiscTexture() {
 const pointGeo = new THREE.BufferGeometry();
 pointGeo.setAttribute( 'position', new THREE.BufferAttribute( pointPositions, 3 ) );
 const pointMat = new THREE.PointsMaterial( {
-	color: 0x8b7bff,
+	color: 0x4ec9b0,
 	size: 0.14,
 	map: createDiscTexture(),
 	transparent: true,
-	opacity: 0.9,
+	opacity: 0.75,
 	sizeAttenuation: true,
 	depthWrite: false,
 } );
@@ -97,7 +97,7 @@ for ( let i = 0; i < nodePositions.length; i ++ ) {
 
 const lineGeo = new THREE.BufferGeometry();
 lineGeo.setAttribute( 'position', new THREE.BufferAttribute( new Float32Array( linePositions ), 3 ) );
-const lineMat = new THREE.LineBasicMaterial( { color: 0x35d0ba, transparent: true, opacity: 0.18 } );
+const lineMat = new THREE.LineBasicMaterial( { color: 0x6ea8fe, transparent: true, opacity: 0.16 } );
 group.add( new THREE.LineSegments( lineGeo, lineMat ) );
 
 let targetRotX = 0;

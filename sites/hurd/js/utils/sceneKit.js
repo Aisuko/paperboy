@@ -1,50 +1,102 @@
 import * as THREE from 'three';
+import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
-// Shared lighting rig + starfield so every world scene reads as part of the
-// same "VR HUD" universe without repeating boilerplate per world.
+// Shared scene furniture for the "instrument console" theme: a neutral
+// studio light rig and a machined deck plate. The old starfield is gone —
+// it read as decorative sci-fi, and the point of these scenes is that they
+// look like a diagnostic rig, not a space sim.
 
-export function addStandardLighting( scene, accent = 0x8b7bff ) {
+export const THEME = {
+	bg: 0x07090b,
+	deck: 0x0c1113,
+	grid: 0x1c262b,
+	gridAccent: 0x2c4a48,
+	accent: 0x4ec9b0,
+	signal: 0xe8a33d,
+	ink: 0xdfe6ea,
+};
 
-	const hemi = new THREE.HemisphereLight( 0x8890ff, 0x0a0a10, 0.55 );
+export function addStandardLighting( scene, accent = THEME.accent ) {
+
+	scene.background = new THREE.Color( THEME.bg );
+	scene.fog = new THREE.FogExp2( THEME.bg, 0.03 );
+
+	const hemi = new THREE.HemisphereLight( 0x8fa6ad, 0x05070a, 0.5 );
 	scene.add( hemi );
 
-	const key = new THREE.DirectionalLight( 0xffffff, 1.4 );
-	key.position.set( 5, 8, 6 );
+	const key = new THREE.DirectionalLight( 0xf2f7f8, 1.5 );
+	key.position.set( 4, 8, 6 );
 	scene.add( key );
 
-	const rim = new THREE.PointLight( accent, 3.5, 40 );
-	rim.position.set( -6, 3, -4 );
+	const fill = new THREE.DirectionalLight( 0x7f939c, 0.45 );
+	fill.position.set( -6, 2, -4 );
+	scene.add( fill );
+
+	const rim = new THREE.PointLight( accent, 2.4, 30 );
+	rim.position.set( -5, 3, -5 );
 	scene.add( rim );
 
-	scene.fog = new THREE.FogExp2( 0x05050a, 0.028 );
-
-	return { hemi, key, rim };
+	return { hemi, key, fill, rim };
 
 }
 
-export function createStarfield( count = 900, radius = 60 ) {
+// A machined deck plate: a dark slab with a measurement grid on it. Replaces
+// the old circular "floor + starfield" pairing.
+export function createDeck( size = 16, { y = -1.6, divisions = 32 } = {} ) {
 
-	const positions = new Float32Array( count * 3 );
-	for ( let i = 0; i < count; i ++ ) {
+	const group = new THREE.Group();
 
-		const r = radius * ( 0.4 + Math.random() * 0.6 );
-		const theta = Math.random() * Math.PI * 2;
-		const phi = Math.acos( 2 * Math.random() - 1 );
-		positions[ i * 3 ] = r * Math.sin( phi ) * Math.cos( theta );
-		positions[ i * 3 + 1 ] = Math.abs( r * Math.cos( phi ) ) * 0.5;
-		positions[ i * 3 + 2 ] = r * Math.sin( phi ) * Math.sin( theta );
+	const plate = new THREE.Mesh(
+		new THREE.PlaneGeometry( size, size ),
+		new THREE.MeshStandardMaterial( { color: THEME.deck, metalness: 0.3, roughness: 0.85, transparent: true, opacity: 0.75 } ),
+	);
+	plate.rotation.x = -Math.PI / 2;
+	plate.position.y = y;
+	group.add( plate );
 
-	}
+	const grid = new THREE.GridHelper( size, divisions, THEME.gridAccent, THEME.grid );
+	grid.position.y = y + 0.005;
+	grid.material.transparent = true;
+	grid.material.opacity = 0.4;
+	group.add( grid );
 
-	const geo = new THREE.BufferGeometry();
-	geo.setAttribute( 'position', new THREE.BufferAttribute( positions, 3 ) );
-	const mat = new THREE.PointsMaterial( { color: 0x8890ff, size: 0.05, transparent: true, opacity: 0.5, sizeAttenuation: true } );
-	return new THREE.Points( geo, mat );
+	return group;
 
 }
 
-// Disposes a component/label group built by createComponentObject (or any
-// THREE.Group of meshes/CSS2DObjects) and detaches it from its parent.
+export function createLabel( text, className = 'label2d' ) {
+
+	const el = document.createElement( 'div' );
+	el.className = className;
+	el.textContent = text;
+	return new CSS2DObject( el );
+
+}
+
+// A thin labelled band used to mark a privilege boundary (kernel mode vs user
+// mode) or a rack shelf.
+export function createShelf( width, depth, { color = THEME.grid, y = 0, opacity = 0.5 } = {} ) {
+
+	const group = new THREE.Group();
+
+	const slab = new THREE.Mesh(
+		new THREE.BoxGeometry( width, 0.02, depth ),
+		new THREE.MeshBasicMaterial( { color, transparent: true, opacity: opacity * 0.16, depthWrite: false } ),
+	);
+	slab.position.y = y;
+	group.add( slab );
+
+	const edges = new THREE.LineSegments(
+		new THREE.EdgesGeometry( new THREE.BoxGeometry( width, 0.02, depth ) ),
+		new THREE.LineBasicMaterial( { color, transparent: true, opacity } ),
+	);
+	edges.position.y = y;
+	group.add( edges );
+
+	return group;
+
+}
+
 export function disposeObject3D( obj ) {
 
 	obj.traverse( ( child ) => {
@@ -63,31 +115,10 @@ export function disposeObject3D( obj ) {
 
 }
 
-// Disposes an IPCLink's tube + particle meshes and detaches them.
+// IPCLink now owns its own group and detaches itself, so this is just a
+// forwarding helper kept for call-site readability.
 export function disposeLink( link ) {
 
 	link.dispose();
-	if ( link.tube.parent ) link.tube.parent.remove( link.tube );
-	link.particles.forEach( ( p ) => { if ( p.parent ) p.parent.remove( p ); } );
-
-}
-
-export function createFloor( radius = 14, color = 0x11111a ) {
-
-	const geo = new THREE.CircleGeometry( radius, 64 );
-	const mat = new THREE.MeshStandardMaterial( { color, metalness: 0.4, roughness: 0.8, transparent: true, opacity: 0.55 } );
-	const mesh = new THREE.Mesh( geo, mat );
-	mesh.rotation.x = -Math.PI / 2;
-	mesh.position.y = -1.6;
-	mesh.receiveShadow = false;
-
-	const grid = new THREE.GridHelper( radius * 2, 28, 0x8b7bff, 0x1a1a24 );
-	grid.position.y = -1.59;
-	grid.material.transparent = true;
-	grid.material.opacity = 0.25;
-
-	const group = new THREE.Group();
-	group.add( mesh, grid );
-	return group;
 
 }

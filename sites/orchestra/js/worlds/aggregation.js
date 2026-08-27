@@ -1,19 +1,21 @@
 import * as THREE from 'three';
 import { AGGREGATION_STEPS } from '../data/aggregationSteps.js';
-import { addStandardLighting, createStarfield, createFloor, createLabel } from '../utils/sceneKit.js';
+import { addStandardLighting, createDeck, createLabel, THEME } from '../utils/sceneKit.js';
+import { assess, DISAGREEMENT_THRESHOLD } from '../data/council.js';
 import { IPCLink } from '../utils/ipcLink.js';
 import { tween, Easing } from '../utils/tween.js';
 
-const SPACING = 2.3;
-const LOW_COLOR = 0x10b981;
-const HIGH_COLOR = 0xf5a623;
+const SPACING = 2.4;
+const LOW_COLOR = THEME.ok;
+const HIGH_COLOR = THEME.signal;
 
 export function buildAggregationWorld() {
 
 	const scene = new THREE.Scene();
-	addStandardLighting( scene, 0x06b6d4 );
-	scene.add( createStarfield() );
-	scene.add( createFloor( 7, 0x0c1620 ) );
+	addStandardLighting( scene );
+	scene.add( createDeck( 30, { y: -2.2, divisions: 60 } ) );
+
+	const result = assess();
 
 	const rig = new THREE.Group();
 	scene.add( rig );
@@ -24,39 +26,52 @@ export function buildAggregationWorld() {
 
 	AGGREGATION_STEPS.forEach( ( step, i ) => {
 
-		const geo = new THREE.IcosahedronGeometry( 0.34, 0 );
-		const mat = new THREE.MeshStandardMaterial( { color: 0x06b6d4, emissive: 0x06b6d4, emissiveIntensity: 0.3, roughness: 0.35, metalness: 0.3 } );
+		const geo = new THREE.OctahedronGeometry( 0.34, 0 );
+		const mat = new THREE.MeshStandardMaterial( { color: THEME.accent, emissive: THEME.accent, emissiveIntensity: 0.3, roughness: 0.35, metalness: 0.3 } );
 		const node = new THREE.Mesh( geo, mat );
 		node.position.set( i * SPACING - offset, 0, 0 );
 		node.userData.stepIndex = i;
 		rig.add( node );
 
-		const label = createLabel( `${ i + 1 }. ${ step.title }`, 'label2d label2d-dim' );
-		label.position.set( 0, 0.55, 0 );
+		// Stagger the captions above and below the chain so four wide labels in
+		// a row never collide.
+		const label = createLabel( `${ i + 1 }. ${ step.title }`, 'label2d label2d-key' );
+		label.position.set( 0, i % 2 === 0 ? 0.62 : -0.5, 0 );
 		node.add( label );
 
 		nodes.push( node );
 
 		if ( i > 0 ) {
 
-			new IPCLink( rig, nodes[ i - 1 ].position.clone(), node.position.clone(), 0x06b6d4, { particleCount: 2, speed: 0.4, radius: 0.018, arc: 0.3 } );
+			new IPCLink( rig, nodes[ i - 1 ].position.clone(), node.position.clone(), THEME.accent, { particleCount: 2, speed: 0.4, radius: 0.018, arc: 0.3 } );
 
 		}
 
 	} );
 
-	// Decision diamond sits above the "detect disagreement" node (index 1).
+	// Decision diamond sits above the "measure the disagreement" node (index 2),
+	// which is the step that actually decides whether the loop runs again.
 	const diamondGeo = new THREE.OctahedronGeometry( 0.26, 0 );
 	const diamondMat = new THREE.MeshStandardMaterial( { color: LOW_COLOR, emissive: LOW_COLOR, emissiveIntensity: 0.9, roughness: 0.25, metalness: 0.3 } );
 	const diamond = new THREE.Mesh( diamondGeo, diamondMat );
-	diamond.position.set( nodes[ 1 ].position.x, 0.75, 0 );
+	diamond.position.set( nodes[ 2 ].position.x, 0.95, 0 );
 	rig.add( diamond );
+
+	const diamondLabel = createLabel(
+		`spread ${ ( result.soh.relativeSpread * 100 ).toFixed( 2 ) }% vs τ ${ ( DISAGREEMENT_THRESHOLD * 100 ).toFixed( 1 ) }%`,
+		'label2d label2d-dim',
+	);
+	diamondLabel.position.set( 0, 0.45, 0 );
+	diamond.add( diamondLabel );
 
 	// Loop-back link from the decision node to step 1, only lit up when the
 	// council disagrees and the pipeline needs to refine its weights.
-	const loopLink = new IPCLink( rig, nodes[ 1 ].position.clone(), nodes[ 0 ].position.clone(), HIGH_COLOR, { particleCount: 3, speed: 0.5, radius: 0.022, arc: -1.1 } );
+	const loopLink = new IPCLink( rig, nodes[ 2 ].position.clone(), nodes[ 1 ].position.clone(), HIGH_COLOR, { particleCount: 3, speed: 0.5, radius: 0.022, arc: -1.3 } );
 	loopLink.setActive( false );
 
+	// The council in this exhibit converges, so the loop-back path is drawn but
+	// dark; it only lights up while the "what if it did not converge" state is
+	// being shown.
 	let highDisagreement = false;
 
 	function setDisagreement( state ) {
@@ -66,6 +81,9 @@ export function buildAggregationWorld() {
 		diamond.material.color.setHex( color );
 		diamond.material.emissive.setHex( color );
 		loopLink.setActive( highDisagreement );
+		diamondLabel.element.textContent = highDisagreement
+			? `spread over τ ${ ( DISAGREEMENT_THRESHOLD * 100 ).toFixed( 1 ) }% — reweight`
+			: `spread ${ ( result.soh.relativeSpread * 100 ).toFixed( 2 ) }% under τ ${ ( DISAGREEMENT_THRESHOLD * 100 ).toFixed( 1 ) }% — converged`;
 
 	}
 
@@ -86,7 +104,7 @@ export function buildAggregationWorld() {
 
 		} );
 
-		if ( index === 1 ) setDisagreement( ! highDisagreement );
+		setDisagreement( false );
 
 	}
 
@@ -99,15 +117,19 @@ export function buildAggregationWorld() {
 		interactables: nodes,
 		totalSteps: total,
 		defaultView: {
-			position: new THREE.Vector3( nodes[ 0 ].position.x, 1.6, 4.2 ),
-			target: new THREE.Vector3( nodes[ 0 ].position.x, 0, 0 ),
+			position: new THREE.Vector3( -0.6, 2.2, 17.0 ),
+			target: new THREE.Vector3( -0.6, 0.3, 0 ),
 		},
+		setDisagreement,
+		result,
 		getStepView( index ) {
 
 			const n = nodes[ Math.max( 0, Math.min( total - 1, index ) ) ];
+			// Drift a little towards the active node without losing the loop.
+			const x = n.position.x * 0.25 - 0.6;
 			return {
-				position: new THREE.Vector3( n.position.x, 1.6, 4.4 ),
-				target: new THREE.Vector3( n.position.x, 0.1, 0 ),
+				position: new THREE.Vector3( x, 2.2, 17.0 ),
+				target: new THREE.Vector3( x, 0.3, 0 ),
 			};
 
 		},

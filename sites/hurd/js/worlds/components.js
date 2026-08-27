@@ -1,59 +1,58 @@
 import * as THREE from 'three';
-import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { COMPONENTS, CATEGORIES } from '../data/components.js';
-import { createComponentObject, pulseHeart } from '../components3d.js';
-import { addStandardLighting, createStarfield, createFloor } from '../utils/sceneKit.js';
+import { createComponentObject, setNodeState, animateComponent } from '../components3d.js';
+import { addStandardLighting, createDeck, createLabel, createShelf, THEME } from '../utils/sceneKit.js';
 import { tween, Easing } from '../utils/tween.js';
 
+// 02 · How many parts does it have. A parts tray: one shelf per category, each
+// module laid out on it so the six different silhouettes can be compared side
+// by side.
+
 const ROW_ORDER = [ 'kernel', 'core', 'io', 'filesystem', 'network', 'memory' ];
+const ROW_SPACING = 1.75;
+const ITEM_SPACING = 1.5;
 
 export function buildComponentsWorld() {
 
 	const scene = new THREE.Scene();
-	addStandardLighting( scene, 0x35d0ba );
-	scene.add( createStarfield() );
-	scene.add( createFloor( 12 ) );
+	addStandardLighting( scene );
+	scene.add( createDeck( 20, { y: -1.2 } ) );
 
 	const rig = new THREE.Group();
 	scene.add( rig );
 
 	const interactables = [];
-	const entries = []; // { object, category }
-	let machRef = null;
-
-	const rowSpacing = 1.9;
-	const itemSpacing = 1.55;
-	const totalRows = ROW_ORDER.length;
+	const entries = [];
 
 	ROW_ORDER.forEach( ( category, rowIndex ) => {
 
 		const items = COMPONENTS.filter( ( c ) => c.category === category );
-		const z = ( rowIndex - ( totalRows - 1 ) / 2 ) * rowSpacing;
-		const rowWidth = ( items.length - 1 ) * itemSpacing;
+		const z = ( rowIndex - ( ROW_ORDER.length - 1 ) / 2 ) * ROW_SPACING;
+		const rowWidth = ( items.length - 1 ) * ITEM_SPACING;
 
-		const rowLabel = document.createElement( 'div' );
-		rowLabel.className = 'label2d';
-		rowLabel.style.color = '#' + CATEGORIES[ category ].color.toString( 16 ).padStart( 6, '0' );
-		rowLabel.textContent = CATEGORIES[ category ].label.toUpperCase();
-		const rowLabelObj = new CSS2DObject( rowLabel );
-		rowLabelObj.position.set( -rowWidth / 2 - 1.1, 0.5, z );
-		rig.add( rowLabelObj );
+		const shelf = createShelf( Math.max( rowWidth + 1.6, 2.4 ), 1.5, {
+			y: -0.62, color: CATEGORIES[ category ].color, opacity: 0.4,
+		} );
+		shelf.position.z = z;
+		rig.add( shelf );
+
+		const rowLabel = createLabel( CATEGORIES[ category ].label.toUpperCase(), 'label2d label2d-dim' );
+		rowLabel.element.style.color = '#' + CATEGORIES[ category ].color.toString( 16 ).padStart( 6, '0' );
+		rowLabel.position.set( -rowWidth / 2 - 1.4, -0.35, z );
+		rig.add( rowLabel );
 
 		items.forEach( ( comp, i ) => {
 
 			const obj = createComponentObject( comp );
-			obj.position.set( -rowWidth / 2 + i * itemSpacing, 0, z );
+			obj.position.set( -rowWidth / 2 + i * ITEM_SPACING, 0, z );
+			setNodeState( obj, 'done' );
 			rig.add( obj );
 			interactables.push( obj );
 			entries.push( { object: obj, category } );
-			if ( comp.id === 'gnu-mach' ) machRef = obj;
 
-			const label = document.createElement( 'div' );
-			label.className = 'label2d';
-			label.textContent = comp.name;
-			const labelObj = new CSS2DObject( label );
-			labelObj.position.set( 0, 0.62, 0 );
-			obj.add( labelObj );
+			const label = createLabel( comp.name, 'label2d' );
+			label.position.set( 0, 0.62, 0 );
+			obj.add( label );
 
 		} );
 
@@ -65,18 +64,20 @@ export function buildComponentsWorld() {
 	function setActiveCategory( category ) {
 
 		activeCategory = category;
-		for ( const { object, category: cat } of entries ) {
+		entries.forEach( ( { object, category: cat } ) => {
 
 			const show = ! category || cat === category;
-			const targetScale = show ? 1 : 0.001;
-			tween( 0.4, ( t ) => {
+			setNodeState( object, show ? ( category ? 'active' : 'done' ) : 'pending' );
 
-				const s = THREE.MathUtils.lerp( object.scale.x, targetScale, t );
-				object.scale.setScalar( s );
+			const from = object.scale.x;
+			const to = show ? 1 : 0.001;
+			tween( 0.35, ( t ) => {
+
+				object.scale.setScalar( THREE.MathUtils.lerp( from, to, t ) );
 
 			}, { easing: Easing.cubicInOut } );
 
-		}
+		} );
 
 	}
 
@@ -87,19 +88,13 @@ export function buildComponentsWorld() {
 		setActiveCategory,
 		getActiveCategory: () => activeCategory,
 		defaultView: {
-			position: new THREE.Vector3( 0, 5.4, 8.6 ),
-			target: new THREE.Vector3( 0, -0.2, 0 ),
+			position: new THREE.Vector3( 0.6, 11.4, 17.6 ),
+			target: new THREE.Vector3( 0.2, -0.8, 0.4 ),
 		},
 		update( dt ) {
 
 			elapsed += dt;
-			for ( const { object } of entries ) {
-
-				if ( object.userData.spin ) object.rotation.y += dt * object.userData.spin * 0.5;
-
-			}
-
-			if ( machRef ) pulseHeart( machRef, elapsed );
+			entries.forEach( ( { object } ) => animateComponent( object, dt, elapsed ) );
 
 		},
 	};

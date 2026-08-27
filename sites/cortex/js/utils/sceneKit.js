@@ -2,66 +2,76 @@ import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { tween, Easing } from './tween.js';
 
-// Shared lighting rig + starfield + small geometry helpers so every world
-// scene reads as part of the same "3D field guide" universe without
-// repeating boilerplate per world.
+// Shared scene furniture for the "instrument console" theme. Matches the
+// Hurd guide's kit so the two exhibits read as one product: a neutral studio
+// rig and a machined deck plate, no starfield.
 
-export function addStandardLighting( scene, accent = 0x8b7bff ) {
+export const THEME = {
+	bg: 0x07090b,
+	deck: 0x0c1113,
+	grid: 0x1c262b,
+	gridAccent: 0x2c4a48,
+	accent: 0x4ec9b0,
+	signal: 0xe8a33d,
+	info: 0x6ea8fe,
+	violet: 0xa78bfa,
+	rose: 0xef8f6e,
+	ink: 0xdfe6ea,
+	muted: 0x38424a,
+};
 
-	const hemi = new THREE.HemisphereLight( 0x8890ff, 0x0a0a10, 0.55 );
+export function addStandardLighting( scene, accent = THEME.accent ) {
+
+	scene.background = new THREE.Color( THEME.bg );
+	scene.fog = new THREE.FogExp2( THEME.bg, 0.022 );
+
+	const hemi = new THREE.HemisphereLight( 0x8fa6ad, 0x05070a, 0.5 );
 	scene.add( hemi );
 
-	const key = new THREE.DirectionalLight( 0xffffff, 1.4 );
-	key.position.set( 5, 8, 6 );
+	const key = new THREE.DirectionalLight( 0xf2f7f8, 1.5 );
+	key.position.set( 4, 8, 6 );
 	scene.add( key );
 
-	const rim = new THREE.PointLight( accent, 3.5, 40 );
-	rim.position.set( -6, 3, -4 );
+	const fill = new THREE.DirectionalLight( 0x7f939c, 0.45 );
+	fill.position.set( -6, 2, -4 );
+	scene.add( fill );
+
+	const rim = new THREE.PointLight( accent, 2.0, 30 );
+	rim.position.set( -5, 3, -5 );
 	scene.add( rim );
 
-	scene.fog = new THREE.FogExp2( 0x05050a, 0.028 );
-
-	return { hemi, key, rim };
+	return { hemi, key, fill, rim };
 
 }
 
-export function createStarfield( count = 900, radius = 60 ) {
-
-	const positions = new Float32Array( count * 3 );
-	for ( let i = 0; i < count; i ++ ) {
-
-		const r = radius * ( 0.4 + Math.random() * 0.6 );
-		const theta = Math.random() * Math.PI * 2;
-		const phi = Math.acos( 2 * Math.random() - 1 );
-		positions[ i * 3 ] = r * Math.sin( phi ) * Math.cos( theta );
-		positions[ i * 3 + 1 ] = Math.abs( r * Math.cos( phi ) ) * 0.5;
-		positions[ i * 3 + 2 ] = r * Math.sin( phi ) * Math.sin( theta );
-
-	}
-
-	const geo = new THREE.BufferGeometry();
-	geo.setAttribute( 'position', new THREE.BufferAttribute( positions, 3 ) );
-	const mat = new THREE.PointsMaterial( { color: 0x8890ff, size: 0.05, transparent: true, opacity: 0.5, sizeAttenuation: true } );
-	return new THREE.Points( geo, mat );
-
-}
-
-export function createFloor( radius = 14, color = 0x11111a ) {
-
-	const geo = new THREE.CircleGeometry( radius, 64 );
-	const mat = new THREE.MeshStandardMaterial( { color, metalness: 0.4, roughness: 0.8, transparent: true, opacity: 0.55 } );
-	const mesh = new THREE.Mesh( geo, mat );
-	mesh.rotation.x = -Math.PI / 2;
-	mesh.position.y = -1.6;
-
-	const grid = new THREE.GridHelper( radius * 2, 28, 0x8b7bff, 0x1a1a24 );
-	grid.position.y = -1.59;
-	grid.material.transparent = true;
-	grid.material.opacity = 0.25;
+// A machined deck plate with a measurement grid on it.
+export function createDeck( size = 16, { y = -1.6, divisions = 32 } = {} ) {
 
 	const group = new THREE.Group();
-	group.add( mesh, grid );
+
+	const plate = new THREE.Mesh(
+		new THREE.PlaneGeometry( size, size ),
+		new THREE.MeshStandardMaterial( { color: THEME.deck, metalness: 0.3, roughness: 0.85, transparent: true, opacity: 0.7 } ),
+	);
+	plate.rotation.x = -Math.PI / 2;
+	plate.position.y = y;
+	group.add( plate );
+
+	const grid = new THREE.GridHelper( size, divisions, THEME.gridAccent, THEME.grid );
+	grid.position.y = y + 0.005;
+	grid.material.transparent = true;
+	grid.material.opacity = 0.35;
+	group.add( grid );
+
 	return group;
+
+}
+
+// Kept under its old name so existing worlds keep working; the circular floor
+// is now the same deck plate everything else stands on.
+export function createFloor( radius = 14, _color = THEME.deck ) {
+
+	return createDeck( radius * 2, { y: -1.6, divisions: Math.round( radius * 3 ) } );
 
 }
 
@@ -84,14 +94,14 @@ export function disposeObject3D( obj ) {
 }
 
 // A small glowing chip/orb used for token nodes across worlds.
-export function createOrbNode( { color = 0x8b7bff, radius = 0.22, emissiveIntensity = 1.4 } = {} ) {
+export function createOrbNode( { color = THEME.info, radius = 0.22, emissiveIntensity = 0.8 } = {} ) {
 
 	const geo = new THREE.SphereGeometry( radius, 24, 24 );
 	const mat = new THREE.MeshStandardMaterial( { color, emissive: color, emissiveIntensity, roughness: 0.35, metalness: 0.2 } );
 	const mesh = new THREE.Mesh( geo, mat );
 
-	const haloGeo = new THREE.SphereGeometry( radius * 1.8, 16, 16 );
-	const haloMat = new THREE.MeshBasicMaterial( { color, transparent: true, opacity: 0.14, depthWrite: false } );
+	const haloGeo = new THREE.SphereGeometry( radius * 1.6, 16, 16 );
+	const haloMat = new THREE.MeshBasicMaterial( { color, transparent: true, opacity: 0.07, depthWrite: false } );
 	mesh.add( new THREE.Mesh( haloGeo, haloMat ) );
 
 	return mesh;
@@ -261,5 +271,13 @@ export function createAxisFrame( { size = 2, labels = [ 'dim 1', 'dim 2', 'dim 3
 	group.add( grid );
 
 	return group;
+
+}
+
+// The theme has no starfield any more. Worlds still import this, so it returns
+// an empty group rather than forcing an edit at every call site.
+export function createStarfield() {
+
+	return new THREE.Group();
 
 }

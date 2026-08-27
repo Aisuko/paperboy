@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 import { TOKENS } from '../data/tokens.js';
-import { addStandardLighting, createStarfield, createFloor, createOrbNode, createLabel, createAxisFrame } from '../utils/sceneKit.js';
+import { addStandardLighting, createDeck, createOrbNode, createLabel, createAxisFrame, THEME } from '../utils/sceneKit.js';
 import { IPCLink } from '../utils/ipcLink.js';
 import { tween } from '../utils/tween.js';
 
-const SPACING = 1.6;
-const TOKEN_COLOR = 0x8b7bff;
-const EMBED_COLOR = 0x35d0ba;
-const NEIGHBOUR_COLOR = 0xff5da2;
+const SPACING = 1.35;
+const TOKEN_COLOR = THEME.info;
+const EMBED_COLOR = THEME.accent;
+const NEIGHBOUR_COLOR = THEME.signal;
 
 // Cosine similarity between two equal-length mock embedding vectors —
 // illustrative only (real GPT-2 embeddings are 768d; these are 4d stand-ins).
@@ -28,9 +28,8 @@ function cosineSimilarity( a, b ) {
 export function buildTokenizeWorld() {
 
 	const scene = new THREE.Scene();
-	addStandardLighting( scene, 0x8b7bff );
-	scene.add( createStarfield() );
-	scene.add( createFloor( 7, 0x0e0e18 ) );
+	addStandardLighting( scene );
+	scene.add( createDeck( 22, { y: -2.4, divisions: 44 } ) );
 
 	const rig = new THREE.Group();
 	scene.add( rig );
@@ -44,17 +43,17 @@ export function buildTokenizeWorld() {
 
 		const x = i * SPACING - offset;
 
-		const chip = createOrbNode( { color: TOKEN_COLOR, radius: 0.24 } );
+		const chip = createOrbNode( { color: TOKEN_COLOR, radius: 0.16 } );
 		chip.position.set( x, 1.6, 0 );
 		chip.userData.detail = {
 			category: 'Token',
-			name: `"${ token.text }"`,
-			blurb: `Token ID ${ token.id }`,
-			description: '',
-			metric: `[${ token.embedding.join( ', ' ) }]`,
-			metricLabel: 'Embedding vector',
+			name: `"${ token.text }"  (id ${ token.id })`,
+			blurb: `Position ${ token.position } in the sequence.`,
+			description: 'GPT-2 byte-pair encoding treats the leading space as part of the token, so " weather" and "weather" are two different IDs. The ID is not a number the model does arithmetic on — it indexes a row of the embedding matrix.',
+			metric: `wte[${ token.id }] + wpe[${ token.position }]`,
+			metricLabel: 'Embedding lookup',
 		};
-		const chipLabel = createLabel( `"${ token.text }" · id ${ token.id }` );
+		const chipLabel = createLabel( `${ token.display } · ${ token.id }`, 'label2d label2d-key' );
 		chipLabel.position.set( 0, 0.42, 0 );
 		chip.add( chipLabel );
 		rig.add( chip );
@@ -62,7 +61,7 @@ export function buildTokenizeWorld() {
 
 		// Project the 4D mock embedding into a small 3D offset below the chip.
 		const [ e0, e1, e2, e3 ] = token.embedding;
-		const point = createOrbNode( { color: EMBED_COLOR, radius: 0.13 } );
+		const point = createOrbNode( { color: EMBED_COLOR, radius: 0.1 } );
 		point.position.set( x + e0 * 1.4, -0.6 + e1 * 1.2, e2 * 1.4 + e3 * 0.6 );
 		rig.add( point );
 		points.push( point );
@@ -71,7 +70,7 @@ export function buildTokenizeWorld() {
 
 	} );
 
-	const embedLabel = createLabel( 'embedding space (768d, projected)', 'label2d label2d-dim' );
+	const embedLabel = createLabel( 'embedding space · 768d, projected to 3d', 'label2d label2d-dim' );
 	embedLabel.position.set( 0, -1.6, 0 );
 	rig.add( embedLabel );
 
@@ -123,12 +122,12 @@ export function buildTokenizeWorld() {
 
 		chips.forEach( ( chip ) => {
 
-			chip.material.emissiveIntensity = stage === 0 ? 1.6 : 0.5;
+			chip.material.emissiveIntensity = stage === 0 ? 1.0 : 0.35;
 
 		} );
 		points.forEach( ( point ) => {
 
-			point.material.emissiveIntensity = stage === 1 ? 1.8 : ( showNeighbours ? 1.1 : 0.6 );
+			point.material.emissiveIntensity = stage === 1 ? 1.1 : ( showNeighbours ? 0.7 : 0.4 );
 			point.scale.setScalar( stage === 1 ? 1.25 : 1 );
 
 		} );
@@ -160,8 +159,8 @@ export function buildTokenizeWorld() {
 		scene,
 		interactables: chips,
 		defaultView: {
-			position: new THREE.Vector3( 0, 1.6, 6.2 ),
-			target: new THREE.Vector3( 0, 0.2, 0 ),
+			position: new THREE.Vector3( 0.8, 1.8, 14.4 ),
+			target: new THREE.Vector3( 0.8, 0.0, 0 ),
 		},
 		showStage,
 		update( dt ) {

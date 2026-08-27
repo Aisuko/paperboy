@@ -1,141 +1,89 @@
 import * as THREE from 'three';
-import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { BOOT_STEPS } from '../data/bootSteps.js';
-import { getComponent, CATEGORIES } from '../data/components.js';
-import { createComponentObject, pulseHeart } from '../components3d.js';
-import { addStandardLighting, createStarfield } from '../utils/sceneKit.js';
-import { IPCLink } from '../utils/ipcLink.js';
-import { tween, Easing } from '../utils/tween.js';
+import { addStandardLighting, createLabel } from '../utils/sceneKit.js';
+import { buildSystemMap, KERNEL_Y, USER_Y } from '../utils/systemMap.js';
 
-const EXTERNAL_LOOK = {
-	grub: { shape: 'module', category: 'kernel', name: 'GRUB', colorOverride: 0x9aa0b8 },
-	login: { shape: 'server', category: 'core', name: 'login', colorOverride: 0x35d0ba },
-};
-
-const SPACING = 2.35;
+// 03 · What starts first. Same machine as the overview page, but dark: each
+// boot step brings one more server up, opens its IPC path down into Mach, and
+// leaves it running. By the last step the whole map is lit — which is the
+// actual point of the page, that a Hurd system boots by *starting processes*,
+// not by loading kernel subsystems.
 
 export function buildBootWorld() {
 
 	const scene = new THREE.Scene();
-	addStandardLighting( scene, 0xffb84d );
-	scene.add( createStarfield() );
+	addStandardLighting( scene );
 
-	const rig = new THREE.Group();
-	scene.add( rig );
+	const map = buildSystemMap( scene, { linkOpacity: 0.1 } );
+	map.resetStates( 'pending' );
 
-	const nodes = [];
-	const total = BOOT_STEPS.length;
-	const offset = ( ( total - 1 ) * SPACING ) / 2;
+	// GRUB sits below the kernel: firmware handing over, outside the Hurd.
+	const grub = new THREE.Mesh(
+		new THREE.BoxGeometry( 0.9, 0.12, 0.55 ),
+		new THREE.MeshStandardMaterial( { color: 0x0e1418, emissive: 0x6b7880, emissiveIntensity: 0.18, metalness: 0.5, roughness: 0.6 } ),
+	);
+	grub.position.set( 0, KERNEL_Y - 0.62, 3.1 );
+	map.group.add( grub );
+	const grubLabel = createLabel( 'GRUB · bootloader', 'label2d label2d-dim' );
+	grubLabel.position.set( 0, 0.28, 0 );
+	grub.add( grubLabel );
 
-	BOOT_STEPS.forEach( ( step, i ) => {
+	// A login banner that only appears on the final step.
+	const login = createLabel( 'login:', 'label2d label2d-key' );
+	login.position.set( 0, USER_Y + 2.2, 0 );
+	login.element.style.opacity = '0';
+	map.group.add( login );
 
-		let comp;
-		if ( step.componentId ) {
-
-			comp = getComponent( step.componentId );
-
-		} else {
-
-			const look = EXTERNAL_LOOK[ step.id ] || EXTERNAL_LOOK.grub;
-			comp = { id: step.id, name: look.name, category: look.category, shape: look.shape };
-
-		}
-
-		const obj = createComponentObject( comp );
-		obj.position.set( i * SPACING - offset, 0, 0 );
-		obj.userData.stepIndex = i;
-		rig.add( obj );
-
-		const label = document.createElement( 'div' );
-		label.className = 'label2d';
-		label.textContent = comp.name;
-		const labelObj = new CSS2DObject( label );
-		labelObj.position.set( 0, 0.7, 0 );
-		obj.add( labelObj );
-
-		nodes.push( obj );
-
-		if ( i > 0 ) {
-
-			const color = CATEGORIES[ comp.category ] ? CATEGORIES[ comp.category ].color : 0xffb84d;
-			new IPCLink( rig, nodes[ i - 1 ].position.clone(), obj.position.clone(), color, {
-				particleCount: 1, speed: 0.4, radius: 0.014, arc: 0.35,
-			} );
-
-		}
-
-	} );
-
-	let elapsed = 0;
 	let currentIndex = 0;
 
-	function highlight( index ) {
+	function goToStep( index ) {
 
-		nodes.forEach( ( node, i ) => {
+		currentIndex = Math.max( 0, Math.min( BOOT_STEPS.length - 1, index ) );
+		const step = BOOT_STEPS[ currentIndex ];
+		const running = new Set( step.activates );
 
-			const active = i === index;
-			const done = i < index;
-			const targetScale = active ? 1.35 : 1;
-			tween( 0.45, ( t ) => {
+		map.nodes.forEach( ( node, id ) => {
 
-				const s = THREE.MathUtils.lerp( node.scale.x, targetScale, t );
-				node.scale.setScalar( s );
-
-			}, { easing: Easing.backOut } );
-
-			node.traverse( ( child ) => {
-
-				if ( child.material && 'emissiveIntensity' in child.material ) {
-
-					child.material.emissiveIntensity = active ? 0.85 : ( done ? 0.4 : 0.2 );
-
-				}
-				if ( child.userData.isEnergyRing ) {
-
-					child.material.opacity = active ? 0.95 : ( done ? 0.6 : 0.3 );
-
-				}
-
-			} );
+			if ( ! running.has( id ) ) { map.setState( id, 'pending' ); map.setLinkActive( id, false ); return; }
+			map.setState( id, id === step.componentId ? 'active' : 'done' );
+			if ( id !== 'gnu-mach' ) map.setLinkActive( id, true );
 
 		} );
 
+		grub.material.emissiveIntensity = currentIndex === 0 ? 0.6 : 0.12;
+		login.element.style.opacity = currentIndex === BOOT_STEPS.length - 1 ? '1' : '0';
+
 	}
 
-	highlight( 0 );
+	goToStep( 0 );
+
+	// Camera framing: early steps sit low near the kernel, later steps pull
+	// back to take in the whole user-space rack as it fills up.
+	function getStepView( index ) {
+
+		const i = Math.max( 0, Math.min( BOOT_STEPS.length - 1, index ) );
+		const t = i / ( BOOT_STEPS.length - 1 );
+		const node = BOOT_STEPS[ i ].componentId ? map.get( BOOT_STEPS[ i ].componentId ) : null;
+		const focusX = node ? node.position.x * 0.2 : 0;
+
+		return {
+			position: new THREE.Vector3( focusX - 0.9, 5.2 + t * 3.4, 14.6 + t * 3.2 ),
+			target: new THREE.Vector3( focusX - 0.9, -1.4 + t * 0.5, 0.6 - t * 2.6 ),
+		};
+
+	}
 
 	return {
 		scene,
-		interactables: nodes,
-		totalSteps: total,
-		defaultView: {
-			position: new THREE.Vector3( nodes[ 0 ].position.x, 2.0, 4.6 ),
-			target: new THREE.Vector3( nodes[ 0 ].position.x, 0, 0 ),
-		},
-		getStepView( index ) {
-
-			const n = nodes[ Math.max( 0, Math.min( total - 1, index ) ) ];
-			return {
-				position: new THREE.Vector3( n.position.x, 2.0, 4.8 ),
-				target: new THREE.Vector3( n.position.x, 0, 0 ),
-			};
-
-		},
-		goToStep( index ) {
-
-			currentIndex = Math.max( 0, Math.min( total - 1, index ) );
-			highlight( currentIndex );
-
-		},
+		map,
+		interactables: map.interactables,
+		totalSteps: BOOT_STEPS.length,
+		defaultView: getStepView( 0 ),
+		getStepView,
+		goToStep,
 		update( dt ) {
 
-			elapsed += dt;
-			nodes.forEach( ( node, i ) => {
-
-				if ( node.userData.spin ) node.rotation.y += dt * node.userData.spin * ( i === currentIndex ? 1.6 : 0.4 );
-				pulseHeart( node, elapsed );
-
-			} );
+			map.update( dt, { activeId: BOOT_STEPS[ currentIndex ].componentId } );
 
 		},
 	};

@@ -1,31 +1,30 @@
 import * as THREE from 'three';
 import { GLOSSARY } from '../data/glossary.js';
-import { addStandardLighting, createStarfield, createFloor, createOrbNode, createLabel } from '../utils/sceneKit.js';
+import { addStandardLighting, createDeck, createOrbNode, createLabel, THEME } from '../utils/sceneKit.js';
 import { IPCLink } from '../utils/ipcLink.js';
 
 const WORLD_NAMES = {
-	tokenize: 'Tokenise & Embed',
-	block: 'Transformer Block',
-	attention: 'Self-Attention Deep-Dive',
-	decode: 'lm_head -> Softmax',
-	train: 'Train vs. Infer',
+	tokenize: '01 Tokenise',
+	block: '02 Block',
+	attention: '03 Attention',
+	output: '04 Output',
+	train: '05 Train vs infer',
 };
 
-const RADIUS = 2.4;
+const RADIUS = 3.2;
 
 export function buildGlossaryWorld() {
 
 	const scene = new THREE.Scene();
-	addStandardLighting( scene, 0x35d0ba );
-	scene.add( createStarfield() );
-	scene.add( createFloor( 6, 0x0e1414 ) );
+	addStandardLighting( scene );
+	scene.add( createDeck( 20, { y: -2.2, divisions: 40 } ) );
 
 	const rig = new THREE.Group();
 	scene.add( rig );
 
-	const core = createOrbNode( { color: 0x35d0ba, radius: 0.22, emissiveIntensity: 1.2 } );
+	const core = createOrbNode( { color: THEME.accent, radius: 0.22, emissiveIntensity: 1.2 } );
 	rig.add( core );
-	const coreLabel = createLabel( 'Glossary' );
+	const coreLabel = createLabel( 'Glossary', 'label2d label2d-key' );
 	coreLabel.position.set( 0, 0.5, 0 );
 	core.add( coreLabel );
 
@@ -37,13 +36,13 @@ export function buildGlossaryWorld() {
 		const angle = ( i / GLOSSARY.length ) * Math.PI * 2;
 		const pos = new THREE.Vector3( Math.cos( angle ) * RADIUS, Math.sin( i * 1.7 ) * 0.4, Math.sin( angle ) * RADIUS );
 
-		const orb = createOrbNode( { color: 0x8b7bff, radius: 0.2 } );
+		const orb = createOrbNode( { color: THEME.info, radius: 0.18 } );
 		orb.position.copy( pos );
 		orb.userData.detail = {
 			category: 'Glossary',
 			name: entry.term,
 			blurb: entry.blurb,
-			description: `${ entry.description } See it in the "${ WORLD_NAMES[ entry.jump ] }" world.`,
+			description: `${ entry.description }\n\nSee it on ${ WORLD_NAMES[ entry.jump ] }.`,
 		};
 		const label = createLabel( entry.term, 'label2d label2d-dim' );
 		label.position.set( 0, 0.32, 0 );
@@ -51,7 +50,7 @@ export function buildGlossaryWorld() {
 		rig.add( orb );
 		nodes.push( orb );
 
-		links.push( new IPCLink( rig, pos.clone(), new THREE.Vector3( 0, 0, 0 ), 0x35d0ba, { particleCount: 2, speed: 0.3, radius: 0.016, arc: 0.25 } ) );
+		links.push( new IPCLink( rig, pos.clone(), new THREE.Vector3( 0, 0, 0 ), THEME.accent, { particleCount: 2, speed: 0.3, radius: 0.014, arc: 0.25 } ) );
 
 	} );
 
@@ -61,7 +60,7 @@ export function buildGlossaryWorld() {
 		scene,
 		interactables: nodes,
 		defaultView: {
-			position: new THREE.Vector3( 0, 2.6, 5.6 ),
+			position: new THREE.Vector3( 0, 4.6, 12.4 ),
 			target: new THREE.Vector3( 0, 0, 0 ),
 		},
 		update( dt ) {

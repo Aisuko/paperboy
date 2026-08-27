@@ -1,41 +1,77 @@
-// The 7-step self-attention walkthrough, content reproduced verbatim from
-// the source Self-Attention Mechanism explainer.
+// The 7-step self-attention walkthrough. Every dimension quoted is GPT-2
+// small's (see data/gpt2.js); `trace` is what the left-hand console prints as
+// each step comes on screen.
+
+import { GPT2 } from './gpt2.js';
+
+const SEQ = 5;
 
 export const ATTENTION_STEPS = [
 	{
-		title: '1. Compute Q, K, V for each head',
-		copy: 'Inside one transformer layer, each head first projects the input hidden states into queries, keys, and values.',
+		title: '1. Project into Q, K and V',
+		copy: 'Each head projects the block input into three different views of the same token: a query (what am I looking for?), a key (what do I offer?) and a value (what do I contribute if chosen?).',
 		equations: [ 'Q_h = X W^Q_h', 'K_h = X W^K_h', 'V_h = X W^V_h' ],
+		trace: [
+			{ text: `in    x         [1, ${ SEQ }, ${ GPT2.dModel }]`, kind: 'dim' },
+			{ text: `op    c_attn    [${ GPT2.dModel }, ${ 3 * GPT2.dModel }]  →  q, k, v`, kind: 'calc' },
+			{ text: `split ${ GPT2.nHead } heads × ${ GPT2.dHead } dims`, kind: 'out' },
+		],
 	},
 	{
-		title: '2. Compute attention weights',
-		copy: 'The core of self-attention: Q_h K_h^T finds token-to-token similarity, then dividing by sqrt(d_k) keeps softmax from getting too sharp as head dimension grows.',
-		equations: [ 'A_h = softmax((Q_h K_h^T) / sqrt(d_k))' ],
+		title: '2. Score every pair, then scale',
+		copy: 'The dot product of a query with a key measures how relevant one token is to another. Dividing by √d_k stops those dot products growing with head size, which would drive softmax into a one-hot spike and kill the gradient.',
+		equations: [ 'S_h = Q_h K_hᵀ / √d_k', `d_k = ${ GPT2.dHead },  √d_k = ${ Math.sqrt( GPT2.dHead ).toFixed( 0 ) }` ],
+		trace: [
+			{ text: `calc  q @ kᵀ     [${ SEQ }, ${ GPT2.dHead }] × [${ GPT2.dHead }, ${ SEQ }]  →  [${ SEQ }, ${ SEQ }]`, kind: 'calc' },
+			{ text: `scale ÷ √${ GPT2.dHead } = ${ Math.sqrt( GPT2.dHead ).toFixed( 0 ) }`, kind: 'out' },
+			{ text: 'mask  j > i set to −inf before softmax', kind: 'warn' },
+			{ text: 'norm  softmax along each row → rows sum to 1', kind: 'calc' },
+		],
 	},
 	{
-		title: '3. Apply attention to values',
-		copy: 'The attention matrix aggregates value vectors — this is the output of one head.',
+		title: '3. Weight the values',
+		copy: 'Each row of the attention matrix is a set of mixing weights. Multiplying it by V produces one output vector per token: a weighted blend of everything that token was allowed to look at.',
 		equations: [ 'Z_h = A_h V_h' ],
+		trace: [
+			{ text: `calc  A @ V      [${ SEQ }, ${ SEQ }] × [${ SEQ }, ${ GPT2.dHead }]  →  [${ SEQ }, ${ GPT2.dHead }]`, kind: 'calc' },
+			{ text: `out   one ${ GPT2.dHead }-dim vector per token, per head`, kind: 'dim' },
+		],
 	},
 	{
-		title: '4. Concatenate all heads',
-		copy: 'All head outputs are concatenated into one vector whose size matches d_model.',
-		equations: [ 'Z = Concat(Z_1, Z_2, ..., Z_H)' ],
+		title: '4. Concatenate the heads',
+		copy: 'All twelve head outputs are laid end to end, restoring the model width. Up to this point no head has seen what any other head did.',
+		equations: [ 'Z = Concat(Z_1, …, Z_H)', `${ GPT2.nHead } × ${ GPT2.dHead } = ${ GPT2.dModel }` ],
+		trace: [
+			{ text: `calc  concat ${ GPT2.nHead } × [${ SEQ }, ${ GPT2.dHead }]  →  [${ SEQ }, ${ GPT2.dModel }]`, kind: 'calc' },
+		],
 	},
 	{
-		title: '5. Apply output projection (W^O)',
-		copy: 'After concatenation, the multi-head output is projected once more with W^O — applied immediately after concatenation, as the final step of the multi-head attention block.',
-		equations: [ 'AttentionOutput = Z W^O' ],
+		title: '5. Project the heads back together (W^O)',
+		copy: 'The concatenated output is passed through one more linear layer. This is the only place the heads mix with each other — remove W^O and twelve heads stay twelve independent channels.',
+		equations: [ 'AttentionOutput = Z W^O', `W^O: [${ GPT2.dModel }, ${ GPT2.dModel }]` ],
+		trace: [
+			{ text: `op    c_proj    [${ GPT2.dModel }, ${ GPT2.dModel }]`, kind: 'calc' },
+			{ text: `out   attn_out  [1, ${ SEQ }, ${ GPT2.dModel }]`, kind: 'dim' },
+		],
 	},
 	{
-		title: '6. Where it sits in the full block',
-		copy: 'The attention sub-block order, from Q/K/V projections through to the residual connection and MLP.',
-		equations: [ 'Q, K, V -> weights -> heads (Z1..ZH) -> concat -> W^O -> residual -> MLP' ],
+		title: '6. Where it sits in the block',
+		copy: 'The attention output does not replace the residual stream — it is added into it, and the MLP that follows reads the result. This is the sub-block that 02 Block walks through end to end.',
+		equations: [ 'ln_1 → attention → +residual → ln_2 → MLP → +residual' ],
+		trace: [
+			{ text: 'calc  x ← x + attn_out', kind: 'calc' },
+			{ text: `note  ${ GPT2.nLayer } blocks stacked, all identically shaped`, kind: 'note' },
+		],
 	},
 	{
-		title: '7. Summary + conceptual check',
-		copy: 'W^O is applied immediately after concatenating all attention-head outputs, as the final linear projection inside the self-attention block. Remove it, and heads can no longer mix information with each other.',
-		equations: [],
+		title: '7. What it costs',
+		copy: 'Attention is quadratic in sequence length: every new token is scored against every token before it. That is the number the KV cache exists to stop from being paid twice.',
+		equations: [ 'scores per step ∝ n', 'scores over a full generation ∝ n²' ],
+		trace: [
+			{ text: `calc  ${ SEQ } tokens → ${ ( SEQ * ( SEQ + 1 ) ) / 2 } scored pairs per head`, kind: 'calc' },
+			{ text: `calc  × ${ GPT2.nHead } heads × ${ GPT2.nLayer } layers = ${ ( ( SEQ * ( SEQ + 1 ) ) / 2 ) * GPT2.nHead * GPT2.nLayer } dot products`, kind: 'out' },
+			{ text: 'note  at 1024 tokens that is 77M per forward pass', kind: 'note' },
+		],
 	},
 ];
 
@@ -97,12 +133,6 @@ export const HEAD_MATRICES = Array.from( { length: HEAD_COUNT }, ( _, h ) => jit
 // Small deterministic per-head "strength" scalar, used to vary ribbon width
 // on head switch without rebuilding geometry.
 export const HEAD_STRENGTH = Array.from( { length: HEAD_COUNT }, ( _, h ) => 0.8 + seededJitter( h * 31 + 5 ) * 0.4 );
-
-export const SCALING_NOTE = {
-	title: 'Why divide by sqrt(d_k)?',
-	lines: [ 'q . k = sum_{t=1}^{d_k} (q_t k_t)', 'Var(q . k) is proportional to d_k' ],
-	copy: 'Without scaling, larger head dimensions produce larger dot-product magnitudes, so softmax becomes too sharp — e.g. [100, 2, 1] -> [1, 0, 0] — causing tiny gradients and unstable training.',
-};
 
 // Naive-recompute vs KV-cache framing for Q/K/V compute cost, shown while
 // steps 1-2 (Q/K/V + attention-weight compute) are on screen. K and V for

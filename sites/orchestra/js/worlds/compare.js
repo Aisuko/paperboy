@@ -1,12 +1,26 @@
 import * as THREE from 'three';
-import { addStandardLighting, createStarfield, createFloor, createOrbNode, createLabel } from '../utils/sceneKit.js';
+import { addStandardLighting, createDeck, createOrbNode, createLabel, THEME } from '../utils/sceneKit.js';
+import { assess, SOH_AGENTS, combine, robustCombine, DISAGREEMENT_THRESHOLD } from '../data/council.js';
 import { IPCLink } from '../utils/ipcLink.js';
 import { tween, Easing } from '../utils/tween.js';
 
-const SINGLE_X = -2.6;
-const COUNCIL_X = 2.6;
-const GOOD_COLOR = 0x10b981;
-const BAD_COLOR = 0xff2d4c;
+const SINGLE_X = -3.4;
+const COUNCIL_X = 3.4;
+const GOOD_COLOR = THEME.ok;
+const BAD_COLOR = THEME.danger;
+
+// One agent's capacity sensor goes bad and it reports 61.6% instead of 94.2%.
+//
+// Naive weighting does *not* save the council here — a confident wrong agent
+// drags the mean down to 78.6%. What saves it is that the disagreement is
+// measurable: spread jumps to 24% against a 1.5% threshold, the aggregation
+// loop fires, the outlier is rejected, and the consensus comes back. A single
+// estimator has no equivalent signal, which is the actual argument for a
+// council.
+const DRIFTED_AGENTS = [ { ...SOH_AGENTS[ 0 ], estimate: 61.6 }, SOH_AGENTS[ 1 ], SOH_AGENTS[ 2 ] ];
+const BASELINE = assess();
+const NAIVE = combine( DRIFTED_AGENTS );
+const RECOVERED = robustCombine( DRIFTED_AGENTS );
 
 function tweenAsync( duration, onUpdate, opts = {} ) {
 
@@ -27,9 +41,8 @@ function wait( ms ) {
 export function buildCompareWorld() {
 
 	const scene = new THREE.Scene();
-	addStandardLighting( scene, 0xff5da2 );
-	scene.add( createStarfield() );
-	scene.add( createFloor( 7, 0x120f18 ) );
+	addStandardLighting( scene );
+	scene.add( createDeck( 26, { y: -2.0, divisions: 52 } ) );
 
 	const rig = new THREE.Group();
 	scene.add( rig );
@@ -41,10 +54,10 @@ export function buildCompareWorld() {
 
 	const singleOrb = createOrbNode( { color: GOOD_COLOR, radius: 0.4, emissiveIntensity: 1.2 } );
 	singleGroup.add( singleOrb );
-	const singleTitle = createLabel( 'Single Estimator', 'label2d' );
+	const singleTitle = createLabel( 'single estimator', 'label2d label2d-key' );
 	singleTitle.position.set( 0, 1.0, 0 );
 	singleGroup.add( singleTitle );
-	const singleReading = createLabel( 'SOH: 94.2%', 'label2d label2d-dim' );
+	const singleReading = createLabel( `SOH ${ BASELINE.soh.value.toFixed( 1 ) }%`, 'label2d label2d-dim' );
 	singleReading.position.set( 0, -0.7, 0 );
 	singleGroup.add( singleReading );
 
@@ -74,10 +87,10 @@ export function buildCompareWorld() {
 	// per-frame update() call below — not re-added to the scene graph.
 	const councilLinks = memberPositions.map( ( pos ) => new IPCLink( councilGroup, pos.clone(), new THREE.Vector3( 0, 0, 0 ), GOOD_COLOR, { particleCount: 2, speed: 0.4, radius: 0.016, arc: 0.4 } ) );
 
-	const councilTitle = createLabel( 'Agent Council', 'label2d' );
+	const councilTitle = createLabel( 'agent council', 'label2d label2d-key' );
 	councilTitle.position.set( 0, 1.0, 0 );
 	councilGroup.add( councilTitle );
-	const councilReading = createLabel( 'SOH: 94.2%', 'label2d label2d-dim' );
+	const councilReading = createLabel( `SOH ${ BASELINE.soh.value.toFixed( 1 ) }%`, 'label2d label2d-dim' );
 	councilReading.position.set( 0, -0.7, 0 );
 	councilGroup.add( councilReading );
 
@@ -88,20 +101,20 @@ export function buildCompareWorld() {
 		if ( running ) return;
 		running = true;
 
-		setNote( 'Single estimator: a corrupted sensor reading feeds straight into the estimate — nothing to check it against.' );
+		setNote( 'Single estimator: a corrupted capacity reading feeds straight into the estimate. There is nothing to check it against.' );
 		await tweenAsync( 1.0, ( t ) => {
 
 			const flash = 0.5 + 0.5 * Math.sin( t * Math.PI * 8 );
 			singleOrb.material.color.lerpColors( new THREE.Color( GOOD_COLOR ), new THREE.Color( BAD_COLOR ), t );
 			singleOrb.material.emissive.copy( singleOrb.material.color );
 			singleOrb.material.emissiveIntensity = 1.2 + flash * 0.8;
-			const fakeValue = 94.2 - t * 32.6 + flash * 6;
-			singleReading.element.textContent = `SOH: ${ fakeValue.toFixed( 1 ) }% (wrong)`;
+			const fakeValue = BASELINE.soh.value - t * ( BASELINE.soh.value - 61.6 ) + flash * 4;
+			singleReading.element.textContent = `SOH ${ fakeValue.toFixed( 1 ) }%  (wrong)`;
 
 		} );
 		await wait( 500 );
 
-		setNote( 'Agent council: one agent drifts the same way, but the others outvote it — the consensus barely moves.' );
+		setNote( `Agent council: the same agent drifts to 61.6%. Weighted naively the consensus follows it down to ${ NAIVE.value.toFixed( 1 ) }% — a council alone is not enough.` );
 		const badMember = members[ 0 ];
 		await tweenAsync( 1.0, ( t ) => {
 
@@ -109,17 +122,17 @@ export function buildCompareWorld() {
 			badMember.material.emissive.copy( badMember.material.color );
 			const wobble = Math.sin( t * Math.PI * 2 ) * 0.4;
 			councilCore.scale.setScalar( 1 + wobble * 0.08 );
-			councilReading.element.textContent = `SOH: ${ ( 94.2 - t * 0.6 ).toFixed( 1 ) }%`;
+			councilReading.element.textContent = `SOH ${ ( BASELINE.soh.value - t * ( BASELINE.soh.value - NAIVE.value ) ).toFixed( 1 ) }%`;
 
 		} );
 		await wait( 500 );
 
-		setNote( 'The council reweights around the disagreement and recovers on its own — no restart needed.' );
+		setNote( `But disagreement is now ${ ( NAIVE.relativeSpread * 100 ).toFixed( 1 ) }% against a ${ ( DISAGREEMENT_THRESHOLD * 100 ).toFixed( 1 ) }% threshold. The loop fires, the outlier is rejected, and the consensus returns to ${ RECOVERED.value.toFixed( 1 ) }% ± ${ RECOVERED.sigma.toFixed( 2 ) }.` );
 		await tweenAsync( 0.8, ( t ) => {
 
 			badMember.material.color.lerpColors( new THREE.Color( BAD_COLOR ), new THREE.Color( GOOD_COLOR ), t );
 			badMember.material.emissive.copy( badMember.material.color );
-			councilReading.element.textContent = `SOH: ${ ( 93.6 + t * 0.6 ).toFixed( 1 ) }%`;
+			councilReading.element.textContent = `SOH ${ ( NAIVE.value + t * ( RECOVERED.value - NAIVE.value ) ).toFixed( 1 ) }%`;
 
 		} );
 
@@ -132,9 +145,9 @@ export function buildCompareWorld() {
 		singleOrb.material.color.set( GOOD_COLOR );
 		singleOrb.material.emissive.set( GOOD_COLOR );
 		singleOrb.material.emissiveIntensity = 1.2;
-		singleReading.element.textContent = 'SOH: 94.2%';
+		singleReading.element.textContent = `SOH ${ BASELINE.soh.value.toFixed( 1 ) }%`;
 		members.forEach( ( m ) => { m.material.color.set( GOOD_COLOR ); m.material.emissive.set( GOOD_COLOR ); } );
-		councilReading.element.textContent = 'SOH: 94.2%';
+		councilReading.element.textContent = `SOH ${ BASELINE.soh.value.toFixed( 1 ) }%`;
 		councilCore.scale.setScalar( 1 );
 
 	}
@@ -145,9 +158,12 @@ export function buildCompareWorld() {
 		triggerDrift,
 		reset,
 		defaultView: {
-			position: new THREE.Vector3( 0, 1.8, 6.4 ),
-			target: new THREE.Vector3( 0, 0, 0 ),
+			position: new THREE.Vector3( -0.5, 1.9, 11.2 ),
+			target: new THREE.Vector3( -0.5, -0.15, 0 ),
 		},
+		baseline: BASELINE,
+		naive: NAIVE,
+		recovered: RECOVERED,
 		update( dt ) {
 
 			for ( const link of councilLinks ) link.update( dt );

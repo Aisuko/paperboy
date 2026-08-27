@@ -1,25 +1,22 @@
-// The four-step uncertainty-aware aggregation sequence from the source
-// Orchestra dashboard's Zone 3.
+// The four-step uncertainty-aware aggregation loop. `trace` is what the
+// left-hand console prints for each step; the numbers in it are computed at
+// runtime from data/council.js so the log and the 3D scene always agree.
 
 export const AGGREGATION_STEPS = [
 	{
-		title: 'Aggregate outputs',
-		description: 'Combine SOH, RUL, Risk and Uncertainty outputs from every agent using uncertainty-aware weighting to form an initial estimate.',
-		tags: [ 'SOH', 'RUL', 'Risk', 'Unc.' ],
+		title: 'Collect the votes',
+		description: 'Every agent reports a point estimate and its own uncertainty σ. Nothing is combined yet — the council is just on the record.',
 	},
 	{
-		title: 'Detect disagreement',
-		description: 'Measure inter-agent disagreement among the council\'s predictions against a threshold τ. Low disagreement moves straight to a final estimate; high disagreement loops back to refine the weights.',
-		tags: [],
+		title: 'Weight by confidence',
+		description: 'Weights are set to 1/σ² and renormalised, so a confident agent pulls the consensus harder than a hesitant one. This is inverse-variance weighting, the same rule used to combine independent measurements anywhere else.',
 	},
 	{
-		title: 'Refine aggregation weights',
-		description: 'When disagreement exceeds τ, reweight contributions using the uncertainty estimates and renormalize before aggregating again.',
-		tags: [],
+		title: 'Measure disagreement',
+		description: 'Spread is the sample standard deviation of the point estimates, taken relative to the consensus so one threshold covers both a percentage and a cycle count. Under τ the pipeline finalises; over it, the weights are refined and the loop runs again.',
 	},
 	{
-		title: 'Produce unified estimate',
-		description: 'Once the council converges, generate the final unified SOH, RUL, Risk and Uncertainty estimate for downstream decision-making.',
-		tags: [ 'SOH ✓', 'RUL ✓', 'Risk ✓', 'Unc. ✓' ],
+		title: 'Unified estimate',
+		description: 'Once the council converges, the weighted mean and its combined σ become the system\'s answer, and the risk band is derived from them.',
 	},
 ];

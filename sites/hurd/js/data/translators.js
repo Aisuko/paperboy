@@ -10,26 +10,31 @@ export const TRANSLATOR_OPTIONS = [
 	{
 		key: 'ftpfs', componentId: 'ftpfs', label: 'ftpfs',
 		command: 'settrans -c /mnt /hurd/ftpfs ftp://ftp.gnu.org/gnu/',
+		listing: 'CRYPTO.README  MailingListArchives  README  before-2003-08-01.md5sums  gnu+linux-distros',
 		note: 'Every lookup under /mnt now speaks FTP behind the scenes. `ls /mnt` becomes an FTP directory listing and `cat /mnt/README` becomes a RETR — no FTP-aware code needed in either tool.',
 	},
 	{
 		key: 'nfs', componentId: 'nfs', label: 'nfs',
 		command: 'settrans -c /mnt /hurd/nfs remote-host:/export',
+		listing: 'datasets  home  scratch  shared',
 		note: 'A remote NFS export now answers every lookup under /mnt as if it were an ordinary local directory.',
 	},
 	{
 		key: 'isofs', componentId: 'isofs', label: 'isofs',
 		command: 'settrans -c /mnt /hurd/isofs /dev/sr0',
+		listing: 'README.txt  dists  install.i386  pool',
 		note: 'A CD/DVD image now answers lookups under /mnt read-only, in ISO 9660 format — the same translator model, just a different backing store.',
 	},
 	{
 		key: 'unionfs', componentId: 'unionfs', label: 'unionfs',
 		command: 'settrans -c /mnt /hurd/unionfs /a /b',
+		listing: 'from-a.txt  from-b.txt  shared.conf',
 		note: 'Two existing directories, /a and /b, are merged into one view under /mnt. Because translators need no special privilege, any user can set this up.',
 	},
 	{
 		key: 'ext2fs', componentId: 'ext2fs', label: 'ext2fs',
 		command: 'settrans -c /mnt /hurd/ext2fs /dev/hd0s2',
+		listing: 'lost+found  projects  backups',
 		note: 'A second disk partition is mounted under /mnt using the very same ext2fs translator that most likely backs your root filesystem too.',
 	},
 

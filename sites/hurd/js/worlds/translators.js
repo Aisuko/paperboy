@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { getComponent, CATEGORIES } from '../data/components.js';
 import { getTranslatorOption } from '../data/translators.js';
-import { createComponentObject, pulseHeart } from '../components3d.js';
-import { addStandardLighting, createStarfield, disposeObject3D, disposeLink } from '../utils/sceneKit.js';
+import { createComponentObject, setNodeState, animateComponent } from '../components3d.js';
+import { addStandardLighting, createDeck, disposeObject3D, disposeLink } from '../utils/sceneKit.js';
 import { IPCLink } from '../utils/ipcLink.js';
 import { tween, Easing } from '../utils/tween.js';
 
@@ -31,8 +31,8 @@ function addLabel( parent, text, y, extraClass ) {
 export function buildTranslatorsWorld() {
 
 	const scene = new THREE.Scene();
-	addStandardLighting( scene, 0xffb84d );
-	scene.add( createStarfield() );
+	addStandardLighting( scene );
+	scene.add( createDeck( 16, { y: -1.4 } ) );
 
 	const rig = new THREE.Group();
 	scene.add( rig );
@@ -41,12 +41,14 @@ export function buildTranslatorsWorld() {
 
 	const rootComp = getComponent( 'ext2fs' );
 	const rootNode = createComponentObject( rootComp );
+	setNodeState( rootNode, 'done' );
 	rootNode.position.set( ROOT_X, 0, 0 );
 	rig.add( rootNode );
 	interactables.push( rootNode );
 	addLabel( rootNode, 'ext2fs (root)', 0.7 );
 
 	const mountNode = createComponentObject( MOUNT_LOOK );
+	setNodeState( mountNode, 'done' );
 	mountNode.position.set( MOUNT_X, 0, 0 );
 	rig.add( mountNode );
 	interactables.push( mountNode );
@@ -92,6 +94,7 @@ export function buildTranslatorsWorld() {
 
 			const comp = getComponent( option.componentId );
 			translatorNode = createComponentObject( comp );
+			setNodeState( translatorNode, 'active' );
 			translatorNode.position.set( TRANSLATOR_X, 0, 0 );
 			translatorNode.scale.setScalar( 0.0001 );
 			rig.add( translatorNode );
@@ -164,8 +167,8 @@ export function buildTranslatorsWorld() {
 		scene,
 		interactables,
 		defaultView: {
-			position: new THREE.Vector3( 0, 4.2, 10 ),
-			target: new THREE.Vector3( 0, -0.2, 0 ),
+			position: new THREE.Vector3( 0.5, 3.4, 11.8 ),
+			target: new THREE.Vector3( 0.5, -0.1, 0 ),
 		},
 		attach,
 		detach: () => detach(),
@@ -175,12 +178,11 @@ export function buildTranslatorsWorld() {
 		update( dt ) {
 
 			elapsed += dt;
-			rig.children.forEach( ( child ) => {
+			[ rootNode, mountNode, translatorNode ].forEach( ( n ) => {
 
-				if ( child.userData.spin ) child.rotation.y += dt * child.userData.spin;
+				if ( n ) animateComponent( n, dt, elapsed, { active: n === translatorNode } );
 
 			} );
-			[ rootNode, mountNode, translatorNode ].forEach( ( n ) => { if ( n ) pulseHeart( n, elapsed ); } );
 			rootLink.update( dt );
 			if ( translatorLink ) translatorLink.update( dt );
 

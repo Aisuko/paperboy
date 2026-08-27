@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { getComponent, CATEGORIES } from '../data/components.js';
-import { createComponentObject, pulseHeart } from '../components3d.js';
-import { addStandardLighting, createStarfield } from '../utils/sceneKit.js';
+import { createComponentObject, setNodeState, animateComponent } from '../components3d.js';
+import { addStandardLighting, createDeck } from '../utils/sceneKit.js';
 import { IPCLink } from '../utils/ipcLink.js';
 import { tween, Easing } from '../utils/tween.js';
 
@@ -16,26 +16,26 @@ import { tween, Easing } from '../utils/tween.js';
 //     minimal kernel (IPC/VM/scheduling) that alone lives in kernel mode.
 //   hybrid: the same services, but the file server & "UNIX" personality
 //     server are pulled back down into kernel mode for performance.
-const COL_X = { mono: -4.8, micro: 0, hybrid: 4.8 };
-const APP_Y = 1.9;
-const BOUNDARY_Y = 0.85;
-const USER_ROW_Y = 1.25;
-const KERNEL_ROW_Y = 0.35;
-const BASE_Y = -0.85;
+const COL_X = { mono: -4.9, micro: 0, hybrid: 4.9 };
+const APP_Y = 3.1;
+const BOUNDARY_Y = 1.35;
+const USER_ROW_Y = 2.0;
+const KERNEL_ROW_Y = 0.5;
+const BASE_Y = -2.2;
 
 const MONO_LAYERS = [
-	{ label: 'VFS, System call', color: 0xff5da2 },
-	{ label: 'IPC, File System', color: 0xffb84d },
-	{ label: 'Scheduler, Virtual Memory', color: 0x4dc3ff },
-	{ label: 'Device Drivers, Dispatcher, …', color: 0x9aa0b8 },
+	{ label: 'VFS, system call', color: 0xe8a33d },
+	{ label: 'IPC, file system', color: 0xa78bfa },
+	{ label: 'Scheduler, virtual memory', color: 0x6ea8fe },
+	{ label: 'Device drivers, dispatcher, …', color: 0x9aa8b0 },
 ];
 
 // The Hurd's real servers standing in for the textbook microkernel roles.
 const MICRO_SERVERS = [
-	{ role: 'Application IPC', componentId: 'exec' },
-	{ role: 'UNIX Server', componentId: 'proc' },
-	{ role: 'Device Driver', componentId: 'pfinet' },
-	{ role: 'File Server', componentId: 'ext2fs' },
+	{ role: 'App IPC', componentId: 'exec' },
+	{ role: 'UNIX server', componentId: 'proc' },
+	{ role: 'Driver', componentId: 'pfinet' },
+	{ role: 'File server', componentId: 'ext2fs' },
 ];
 
 // No single real OS is "the" hybrid kernel, so these four roles are drawn
@@ -43,13 +43,13 @@ const MICRO_SERVERS = [
 // above, so the only visual difference between the two columns is which two
 // services dip into kernel mode.
 const HYBRID_SERVERS = [
-	{ role: 'Application IPC', id: 'hybrid-app-ipc', category: 'core', shape: 'server', inKernel: false },
-	{ role: 'UNIX Server', id: 'hybrid-unix', category: 'core', shape: 'server', inKernel: true },
-	{ role: 'Device Driver', id: 'hybrid-driver', category: 'network', shape: 'antenna', inKernel: false },
-	{ role: 'File Server', id: 'hybrid-file', category: 'filesystem', shape: 'disk', inKernel: true },
+	{ role: 'App IPC', id: 'hybrid-app-ipc', category: 'core', shape: 'server', inKernel: false },
+	{ role: 'UNIX server', id: 'hybrid-unix', category: 'core', shape: 'server', inKernel: true },
+	{ role: 'Driver', id: 'hybrid-driver', category: 'network', shape: 'antenna', inKernel: false },
+	{ role: 'File server', id: 'hybrid-file', category: 'filesystem', shape: 'disk', inKernel: true },
 ];
 
-const APP_COLOR = 0x4ce07a;
+const APP_COLOR = 0x6fcf7f;
 
 function addLabel( parent, text, y, extraClass, x = 0 ) {
 
@@ -116,7 +116,7 @@ function buildMonolith() {
 			color: 0x14141c, emissive: layer.color, emissiveIntensity: 0.32, metalness: 0.6, roughness: 0.35,
 		} );
 		const mesh = new THREE.Mesh( new THREE.BoxGeometry( 1.9, h, 1.9 ), mat );
-		mesh.position.y = -0.7 + i * h;
+		mesh.position.y = -1.9 + i * h;
 		group.add( mesh );
 		layerMeshes.push( mesh );
 
@@ -128,7 +128,7 @@ function buildMonolith() {
 		new THREE.EdgesGeometry( new THREE.BoxGeometry( 1.92, h * 4, 1.92 ) ),
 		new THREE.LineBasicMaterial( { color: 0xffffff, transparent: true, opacity: 0.35 } ),
 	);
-	outline.position.y = -0.7 + h * 1.5;
+	outline.position.y = -1.9 + h * 1.5;
 	group.add( outline );
 
 	return { group, layerMeshes };
@@ -138,18 +138,20 @@ function buildMonolith() {
 function buildServerRow( servers, resolveComponent ) {
 
 	const nodes = [];
-	const spacing = 1.05;
+	const spacing = 1.3;
 	const offset = ( ( servers.length - 1 ) * spacing ) / 2;
 
 	servers.forEach( ( spec, i ) => {
 
 		const comp = resolveComponent( spec );
 		const obj = createComponentObject( comp );
+		setNodeState( obj, 'done' );
 		obj.scale.setScalar( 0.72 );
 		obj.position.x = i * spacing - offset;
 		obj.position.y = spec.inKernel ? KERNEL_ROW_Y : USER_ROW_Y;
 		obj.userData.role = spec.role;
-		addLabel( obj, spec.role, 0.6, 'label2d-dim' );
+		// Stagger label height so neighbouring roles in a row never collide.
+		addLabel( obj, spec.role, i % 2 === 0 ? 0.66 : -0.62, 'label2d-dim' );
 		nodes.push( obj );
 
 	} );
@@ -181,13 +183,13 @@ function buildColumn( kind ) {
 		group.add( mono.group );
 		layerMeshes = mono.layerMeshes;
 
-		links.push( new IPCLink( group, new THREE.Vector3( 0, 0.56 + 0.21, 0 ), appNode.position.clone(), 0xff5da2, {
+		links.push( new IPCLink( group, new THREE.Vector3( 0, -1.9 + 0.42 * 3.5, 0 ), appNode.position.clone(), 0xe8a33d, {
 			particleCount: 2, speed: 0.32, radius: 0.016, arc: 0.5,
 		} ) );
 
 	} else {
 
-		group.add( buildBoundary( 2.05 ) );
+		group.add( buildBoundary( 2.7 ) );
 
 		const specs = kind === 'micro' ? MICRO_SERVERS : HYBRID_SERVERS;
 		const resolve = kind === 'micro'
@@ -201,14 +203,15 @@ function buildColumn( kind ) {
 			? getComponent( 'gnu-mach' )
 			: { id: 'hybrid-base', name: 'Basic IPC, Virtual Memory, Scheduling', category: 'kernel', shape: 'core' };
 		baseNode = createComponentObject( baseComp );
+		setNodeState( baseNode, 'active' );
 		baseNode.scale.setScalar( 0.62 );
 		baseNode.position.y = BASE_Y;
 		group.add( baseNode );
-		addLabel( baseNode, 'Basic IPC, Virtual Memory, Scheduling', -0.5, 'label2d-dim' );
+		addLabel( baseNode, 'Basic IPC · virtual memory · scheduling', -0.55, 'label2d-dim' );
 
 		serverNodes.forEach( ( node ) => {
 
-			const color = CATEGORIES[ node.userData.category ] ? CATEGORIES[ node.userData.category ].color : 0x8b7bff;
+			const color = CATEGORIES[ node.userData.category ] ? CATEGORIES[ node.userData.category ].color : 0x4ec9b0;
 			links.push( new IPCLink( group, appNode.position.clone(), node.position.clone(), color, {
 				particleCount: 1, speed: 0.3, radius: 0.014, arc: 0.4,
 			} ) );
@@ -246,8 +249,8 @@ function wait( ms ) {
 export function buildCompareWorld() {
 
 	const scene = new THREE.Scene();
-	addStandardLighting( scene, 0xff5da2 );
-	scene.add( createStarfield() );
+	addStandardLighting( scene );
+	scene.add( createDeck( 26, { y: -1.7, divisions: 40 } ) );
 
 	const rig = new THREE.Group();
 	scene.add( rig );
@@ -270,7 +273,7 @@ export function buildCompareWorld() {
 		if ( crashing ) return;
 		crashing = true;
 
-		const crashColor = new THREE.Color( 0xff2d4c );
+		const crashColor = new THREE.Color( 0xe5644e );
 
 		// 1. Monolithic: a fault anywhere in the fused kernel takes it all down.
 		setNote( 'Monolithic: a bug in the filesystem driver runs in kernel space — it takes the whole kernel down with it.' );
@@ -403,22 +406,18 @@ export function buildCompareWorld() {
 		interactables: [ microCol.baseNode, ...microCol.serverNodes ],
 		triggerCrash,
 		defaultView: {
-			position: new THREE.Vector3( -3.0, 3.6, 16.5 ),
-			target: new THREE.Vector3( -3.0, 0.3, 0 ),
+			position: new THREE.Vector3( -0.8, 3.0, 27.5 ),
+			target: new THREE.Vector3( -0.8, 0.5, 0 ),
 		},
 		update( dt ) {
 
 			elapsed += dt;
-			pulseHeart( microCol.baseNode, elapsed );
-			pulseHeart( hybridCol.baseNode, elapsed );
+			animateComponent( microCol.baseNode, dt, elapsed, { active: true } );
+			animateComponent( hybridCol.baseNode, dt, elapsed, { active: true } );
 			[ monoCol, microCol, hybridCol ].forEach( ( col ) => {
 
-				const spinners = [ col.appNode, ...( col.serverNodes || [] ) ];
-				for ( const s of spinners ) {
-
-					if ( s.userData.spin ) s.rotation.y += dt * s.userData.spin;
-
-				}
+				for ( const node of col.serverNodes || [] ) animateComponent( node, dt, elapsed );
+				if ( col.appNode.userData.spin ) col.appNode.rotation.y += dt * col.appNode.userData.spin;
 
 			} );
 			for ( const link of links ) link.update( dt );

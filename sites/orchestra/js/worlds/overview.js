@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { ZONES } from '../data/zones.js';
-import { addStandardLighting, createStarfield, createLabel } from '../utils/sceneKit.js';
+import { addStandardLighting, createDeck, createLabel, THEME } from '../utils/sceneKit.js';
 import { IPCLink } from '../utils/ipcLink.js';
 
-export const ZONE_SPACING = 6;
+export const ZONE_SPACING = 4.2;
 
 export function zoneX( index ) {
 
@@ -70,8 +70,8 @@ function createZoneIcon( key, color ) {
 export function buildOverviewWorld() {
 
 	const scene = new THREE.Scene();
-	addStandardLighting( scene, 0x8b7bff );
-	scene.add( createStarfield() );
+	addStandardLighting( scene );
+	scene.add( createDeck( 40, { y: -1.75, divisions: 80 } ) );
 
 	const rig = new THREE.Group();
 	scene.add( rig );
@@ -87,7 +87,7 @@ export function buildOverviewWorld() {
 		const x = zoneX( i );
 		platform.position.set( x, -1.6, 0 );
 
-		const floorGeo = new THREE.CylinderGeometry( 1.5, 1.6, 0.14, 32 );
+		const floorGeo = new THREE.CylinderGeometry( 1.15, 1.25, 0.12, 32 );
 		const floorMat = new THREE.MeshStandardMaterial( { color: zone.color, emissive: zone.color, emissiveIntensity: 0.25, roughness: 0.6, metalness: 0.3, transparent: true, opacity: 0.85 } );
 		platform.add( new THREE.Mesh( floorGeo, floorMat ) );
 
@@ -95,8 +95,8 @@ export function buildOverviewWorld() {
 		platform.add( icon );
 		spinning.push( icon );
 
-		const label = createLabel( `${ zone.index } · ${ zone.label }` );
-		label.position.set( 0, 1.5, 0 );
+		const label = createLabel( `${ zone.index } · ${ zone.label }`, 'label2d label2d-key' );
+		label.position.set( 0, 1.65, 0 );
 		platform.add( label );
 
 		platform.userData.detail = {
@@ -125,8 +125,8 @@ export function buildOverviewWorld() {
 		scene,
 		interactables,
 		defaultView: {
-			position: new THREE.Vector3( 0, 4.2, 13 ),
-			target: new THREE.Vector3( 0, -0.6, 0 ),
+			position: new THREE.Vector3( -0.9, 4.6, 28.0 ),
+			target: new THREE.Vector3( -0.9, -0.9, 0 ),
 		},
 		legendZones: ZONES,
 		update( dt ) {

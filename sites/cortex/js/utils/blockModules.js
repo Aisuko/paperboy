@@ -121,7 +121,7 @@ const BUILDERS = {
 	'mlp': buildMlp,
 };
 
-export function createStageModule( type, { scale = 1, color = 0x8b7bff, accentColor = 0xff5da2 } = {} ) {
+export function createStageModule( type, { scale = 1, color = 0x4ec9b0, accentColor = 0xe8a33d } = {} ) {
 
 	const group = new THREE.Group();
 	group.userData.type = type;

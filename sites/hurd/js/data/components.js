@@ -5,12 +5,12 @@
 // ~2 dozen servers/translators so the 3D scenes stay readable.
 
 export const CATEGORIES = {
-	kernel: { label: 'Microkernel', color: 0x8b7bff },
-	core: { label: 'Core servers', color: 0xff5da2 },
-	io: { label: 'I/O translators', color: 0x35d0ba },
-	filesystem: { label: 'Filesystem translators', color: 0xffb84d },
-	network: { label: 'Network translators', color: 0x4dc3ff },
-	memory: { label: 'Memory management', color: 0xc792ff },
+	kernel: { label: 'Microkernel', color: 0x4ec9b0 },
+	core: { label: 'Core servers', color: 0xe8a33d },
+	io: { label: 'I/O translators', color: 0x6ea8fe },
+	filesystem: { label: 'Filesystem translators', color: 0xa78bfa },
+	network: { label: 'Network translators', color: 0x4dd0e1 },
+	memory: { label: 'Memory management', color: 0xef8f6e },
 };
 
 export const COMPONENTS = [
@@ -92,7 +92,7 @@ export const COMPONENTS = [
 		blurb: 'Symbolic-link translator',
 		description: "Provides symbolic-link semantics for filesystems or scenarios that can't natively express them, letting the same ‘attach a translator to a node’ mechanism stand in for a native symlink.",
 		responsibilities: [ 'Symlink semantics for translators lacking native support' ],
-		monolithic: "Symlinks are a native inode type in most Linux filesystems; Hurd can synthesize the same behaviour entirely in user space.",
+		monolithic: "Symlinks are a native inode type in most Linux filesystems; Hurd can synthesise the same behaviour entirely in user space.",
 		shape: 'module',
 	},
 	{
@@ -165,11 +165,5 @@ export const COMPONENTS = [
 export function getComponent( id ) {
 
 	return COMPONENTS.find( ( c ) => c.id === id ) || null;
-
-}
-
-export function componentsByCategory( category ) {
-
-	return COMPONENTS.filter( ( c ) => c.category === category );
 
 }

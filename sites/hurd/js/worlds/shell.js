@@ -1,194 +1,149 @@
 import * as THREE from 'three';
-import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { getComponent, CATEGORIES } from '../data/components.js';
-import { createComponentObject, pulseHeart } from '../components3d.js';
-import { addStandardLighting, createStarfield, disposeObject3D, disposeLink } from '../utils/sceneKit.js';
+import { CATEGORIES } from '../data/components.js';
+import { createComponentObject, setNodeState, animateComponent } from '../components3d.js';
+import { addStandardLighting, createLabel, disposeLink } from '../utils/sceneKit.js';
+import { buildSystemMap, USER_Y } from '../utils/systemMap.js';
 import { IPCLink } from '../utils/ipcLink.js';
-import { tween, Easing } from '../utils/tween.js';
 
-// bash is a pseudo-component — the shell process itself — not one of the
-// real Hurd servers in data/components.js, so it needs its own look.
-const EXTERNAL_LOOK = {
-	bash: { shape: 'module', category: 'core', name: 'bash' },
-};
+// 05 · Run a command. The same machine again, with a shell process hovering
+// above it. Running a command draws the actual hop path — bash to proc to exec
+// to auth to ext2fs to term — as directed IPC links over the resting map, so
+// you can see one syscall's worth of message passing cross the whole system.
 
-const SPACING = 2.35;
-
-function resolveStepComponent( step ) {
-
-	const comp = getComponent( step.componentId );
-	if ( comp ) return comp;
-	const look = EXTERNAL_LOOK[ step.componentId ] || EXTERNAL_LOOK.bash;
-	return { id: step.componentId, name: look.name, category: look.category, shape: look.shape };
-
-}
+const BASH_POS = new THREE.Vector3( 0, USER_Y + 2.2, 1.1 );
 
 export function buildShellWorld() {
 
 	const scene = new THREE.Scene();
-	addStandardLighting( scene, 0x4ce07a );
-	scene.add( createStarfield() );
+	addStandardLighting( scene );
 
-	const rig = new THREE.Group();
-	scene.add( rig );
+	const map = buildSystemMap( scene, { linkOpacity: 0.07 } );
+	map.resetStates( 'done' );
 
-	const nodes = []; // mutated in place so main.js's stored `interactables` reference stays valid
-	let links = [];
+	// bash is not a Hurd server — it is an ordinary process, drawn as a small
+	// coupler above the rack.
+	const bash = createComponentObject( { id: 'bash', name: 'bash', category: 'core', shape: 'module' } );
+	bash.position.copy( BASH_POS );
+	map.group.add( bash );
+	const bashLabel = createLabel( 'bash · pid 47', 'label2d label2d-key' );
+	bashLabel.position.set( 0, 0.5, 0 );
+	bash.add( bashLabel );
+
+	function positionOf( componentId ) {
+
+		return componentId === 'bash' ? BASH_POS.clone() : map.positionOf( componentId );
+
+	}
+
+	function nodeOf( componentId ) {
+
+		return componentId === 'bash' ? bash : map.get( componentId );
+
+	}
+
+	let hopLinks = [];
+	let steps = [];
 	let currentIndex = 0;
-	let idleLabel = null;
 
-	function clearChain() {
+	function clearHops() {
 
-		[ ...nodes ].forEach( ( n ) => disposeObject3D( n ) );
-		nodes.length = 0;
-		links.forEach( ( l ) => disposeLink( l ) );
-		links = [];
-		if ( idleLabel ) { disposeObject3D( idleLabel ); idleLabel = null; }
+		hopLinks.forEach( ( l ) => disposeLink( l ) );
+		hopLinks = [];
 
 	}
 
-	function showIdle() {
+	function reset() {
 
-		clearChain();
-
-		const comp = { id: 'bash-idle', name: 'bash', category: EXTERNAL_LOOK.bash.category, shape: EXTERNAL_LOOK.bash.shape };
-		const obj = createComponentObject( comp );
-		rig.add( obj );
-		nodes.push( obj );
-
-		const label = document.createElement( 'div' );
-		label.className = 'label2d';
-		label.textContent = 'bash';
-		const labelObj = new CSS2DObject( label );
-		labelObj.position.set( 0, 0.7, 0 );
-		obj.add( labelObj );
-
-		const hint = document.createElement( 'div' );
-		hint.className = 'label2d label2d-dim';
-		hint.textContent = 'waiting for a command ↓';
-		const hintObj = new CSS2DObject( hint );
-		hintObj.position.set( 0, -0.75, 0 );
-		obj.add( hintObj );
-		idleLabel = hintObj;
-
+		clearHops();
+		steps = [];
 		currentIndex = 0;
+		map.resetStates( 'done' );
+		setNodeState( bash, 'active' );
 
 	}
 
-	function highlight( index ) {
+	function runCommand( commandSteps ) {
 
-		nodes.forEach( ( node, i ) => {
+		clearHops();
+		steps = commandSteps;
+		currentIndex = 0;
+		map.resetStates( 'done' );
 
-			const active = i === index;
-			const done = i < index;
-			const targetScale = active ? 1.35 : 1;
-			tween( 0.45, ( t ) => {
+		// One directed link per hop, dark until the trace reaches it.
+		for ( let i = 1; i < steps.length; i ++ ) {
 
-				const s = THREE.MathUtils.lerp( node.scale.x, targetScale, t );
-				node.scale.setScalar( s );
+			const from = positionOf( steps[ i - 1 ].componentId );
+			const to = positionOf( steps[ i ].componentId );
+			const comp = steps[ i ].componentId;
+			const color = CATEGORIES[ map.get( comp )?.userData.category ]?.color ?? 0x4ec9b0;
 
-			}, { easing: Easing.backOut } );
-
-			node.traverse( ( child ) => {
-
-				if ( child.material && 'emissiveIntensity' in child.material ) {
-
-					child.material.emissiveIntensity = active ? 0.85 : ( done ? 0.4 : 0.2 );
-
-				}
-				if ( child.userData.isEnergyRing ) {
-
-					child.material.opacity = active ? 0.95 : ( done ? 0.6 : 0.3 );
-
-				}
-
+			const link = new IPCLink( map.group, from, to, color, {
+				particleCount: 2, speed: 0.55, radius: 0.016, arc: 0.75, tubeOpacity: 0.16,
 			} );
+			link.setActive( false );
+			hopLinks.push( link );
 
-		} );
+		}
 
-		links.forEach( ( link, i ) => link.setActive( i < index ) );
+		goToStep( 0 );
 
 	}
 
-	function runCommand( steps ) {
+	function goToStep( index ) {
 
-		clearChain();
+		if ( ! steps.length ) return;
+		currentIndex = Math.max( 0, Math.min( steps.length - 1, index ) );
 
-		const total = steps.length;
-		const offset = ( ( total - 1 ) * SPACING ) / 2;
+		map.nodes.forEach( ( n ) => setNodeState( n, 'done' ) );
+		setNodeState( bash, 'done' );
 
 		steps.forEach( ( step, i ) => {
 
-			const comp = resolveStepComponent( step );
-			const obj = createComponentObject( comp );
-			obj.position.set( i * SPACING - offset, 0, 0 );
-			obj.userData.stepIndex = i;
-			rig.add( obj );
-
-			const label = document.createElement( 'div' );
-			label.className = 'label2d';
-			label.textContent = comp.name;
-			const labelObj = new CSS2DObject( label );
-			labelObj.position.set( 0, 0.7, 0 );
-			obj.add( labelObj );
-
-			nodes.push( obj );
-
-			if ( i > 0 ) {
-
-				const color = CATEGORIES[ comp.category ] ? CATEGORIES[ comp.category ].color : 0x4ce07a;
-				const link = new IPCLink( rig, nodes[ i - 1 ].position.clone(), obj.position.clone(), color, {
-					particleCount: 1, speed: 0.5, radius: 0.014, arc: 0.35,
-				} );
-				links.push( link );
-
-			}
+			const node = nodeOf( step.componentId );
+			if ( ! node ) return;
+			if ( i === currentIndex ) setNodeState( node, 'active' );
 
 		} );
 
-		currentIndex = 0;
-		highlight( 0 );
+		hopLinks.forEach( ( link, i ) => link.setActive( i < currentIndex ) );
 
 	}
 
-	showIdle();
+	reset();
+
+	function getStepView( index ) {
+
+		if ( ! steps.length ) return this.defaultView;
+		const node = nodeOf( steps[ Math.max( 0, Math.min( steps.length - 1, index ) ) ].componentId );
+		const p = node ? node.position : new THREE.Vector3();
+		return {
+			position: new THREE.Vector3( p.x * 0.18 - 0.9, p.y + 5.8, p.z * 0.4 + 13.6 ),
+			target: new THREE.Vector3( p.x * 0.18 - 0.9, p.y - 1.4, p.z * 0.4 - 1.2 ),
+		};
+
+	}
 
 	let elapsed = 0;
 
 	return {
 		scene,
-		interactables: nodes,
+		map,
+		interactables: [ ...map.interactables, bash ],
 		defaultView: {
-			position: new THREE.Vector3( 0, 2.0, 4.6 ),
-			target: new THREE.Vector3( 0, 0, 0 ),
+			position: new THREE.Vector3( -0.9, 7.8, 16.2 ),
+			target: new THREE.Vector3( -0.9, -0.6, -1.8 ),
 		},
-		getStepView( index ) {
-
-			const n = nodes[ Math.max( 0, Math.min( nodes.length - 1, index ) ) ];
-			return {
-				position: new THREE.Vector3( n.position.x, 2.0, 4.8 ),
-				target: new THREE.Vector3( n.position.x, 0, 0 ),
-			};
-
-		},
+		getStepView,
 		runCommand,
-		reset: showIdle,
-		goToStep( index ) {
-
-			currentIndex = Math.max( 0, Math.min( nodes.length - 1, index ) );
-			highlight( currentIndex );
-
-		},
+		reset,
+		goToStep,
 		update( dt ) {
 
 			elapsed += dt;
-			nodes.forEach( ( node, i ) => {
-
-				if ( node.userData.spin ) node.rotation.y += dt * node.userData.spin * ( i === currentIndex ? 1.6 : 0.4 );
-				pulseHeart( node, elapsed );
-
-			} );
-			links.forEach( ( link ) => link.update( dt ) );
+			const activeId = steps.length ? steps[ currentIndex ].componentId : 'bash';
+			map.update( dt, { activeId } );
+			animateComponent( bash, dt, elapsed, { active: activeId === 'bash' } );
+			hopLinks.forEach( ( link ) => link.update( dt ) );
 
 		},
 	};

@@ -1,26 +1,26 @@
 import * as THREE from 'three';
 import { TOKENS } from '../data/tokens.js';
 import { ATTENTION_STEPS, MOCK_ATTENTION_MATRIX, HEAD_COUNT, HEAD_MATRICES, HEAD_STRENGTH } from '../data/attentionSteps.js';
-import { addStandardLighting, createStarfield, createFloor, createOrbNode, createHeatmapPlane, setHeatmapValues, createLabel } from '../utils/sceneKit.js';
+import { addStandardLighting, createDeck, createOrbNode, createHeatmapPlane, setHeatmapValues, createLabel, THEME } from '../utils/sceneKit.js';
 import { RibbonLink, createRibbon } from '../utils/ribbon.js';
 import { createStageModule } from '../utils/blockModules.js';
 import { tween, Easing } from '../utils/tween.js';
 
 const SPACING = 1.1;
-const Q_COLOR = 0x8b7bff;
-const K_COLOR = 0x35d0ba;
-const V_COLOR = 0xff5da2;
+const Q_COLOR = THEME.info;
+const K_COLOR = THEME.accent;
+const V_COLOR = THEME.signal;
 const TOKEN_Y = 2.2;
 const HEATMAP_Y = 0.4;
 const ZOUT_Y = -0.9;
 const CONCAT_Y = -1.7;
 const WO_Y = -2.4;
 
-const SPLIT_COLOR = new THREE.Color( 0x35d0ba );
-const MERGED_COLOR = new THREE.Color( 0x8b7bff );
+const SPLIT_COLOR = new THREE.Color( THEME.accent );
+const MERGED_COLOR = new THREE.Color( THEME.info );
 
 const MINI_TYPES = [ 'layernorm', 'self-attention', 'residual-add', 'mlp' ];
-const MINI_COLORS = [ 0x35d0ba, 0x8b7bff, 0xff5da2, 0x8b7bff ];
+const MINI_COLORS = [ THEME.accent, THEME.info, THEME.signal, THEME.violet ];
 
 function miniConnector( from, to, color ) {
 
@@ -36,9 +36,8 @@ function miniConnector( from, to, color ) {
 export function buildAttentionWorld() {
 
 	const scene = new THREE.Scene();
-	addStandardLighting( scene, 0x35d0ba );
-	scene.add( createStarfield() );
-	scene.add( createFloor( 7, 0x0e1418 ) );
+	addStandardLighting( scene );
+	scene.add( createDeck( 28, { y: -3.6, divisions: 56 } ) );
 
 	const rig = new THREE.Group();
 	scene.add( rig );
@@ -52,9 +51,9 @@ export function buildAttentionWorld() {
 	TOKENS.forEach( ( token, i ) => {
 
 		const x = i * SPACING - offset;
-		const chip = createOrbNode( { color: 0x8b7bff, radius: 0.16 } );
+		const chip = createOrbNode( { color: THEME.info, radius: 0.16 } );
 		chip.position.set( x, TOKEN_Y, 0 );
-		const label = createLabel( token.text, 'label2d label2d-dim' );
+		const label = createLabel( token.display, 'label2d label2d-key' );
 		label.position.set( 0, 0.3, 0 );
 		chip.add( label );
 		rig.add( chip );
@@ -80,7 +79,7 @@ export function buildAttentionWorld() {
 
 		} );
 
-		const zOrb = createOrbNode( { color: 0x35d0ba, radius: 0.14 } );
+		const zOrb = createOrbNode( { color: THEME.accent, radius: 0.14 } );
 		zOrb.position.set( x, ZOUT_Y, 0 );
 		zOrb.userData.baseX = x;
 		zOrb.userData.jitter = ( i % 2 === 0 ? 1 : -1 ) * 0.06;
@@ -95,7 +94,7 @@ export function buildAttentionWorld() {
 
 	} );
 
-	const heatmap = createHeatmapPlane( MOCK_ATTENTION_MATRIX, { cols: TOKENS.length, cellSize: 0.32, baseColor: new THREE.Color( 0x35d0ba ) } );
+	const heatmap = createHeatmapPlane( MOCK_ATTENTION_MATRIX, { cols: TOKENS.length, cellSize: 0.32, baseColor: new THREE.Color( THEME.accent ) } );
 	heatmap.position.set( 0, HEATMAP_Y, 0 );
 	heatmap.userData.detail = {
 		category: 'Attention weights',
@@ -114,14 +113,14 @@ export function buildAttentionWorld() {
 		return sum / HEAD_MATRICES.length;
 
 	} );
-	const ghostHeatmap = createHeatmapPlane( aggregateMatrix, { cols: TOKENS.length, cellSize: 0.32, baseColor: new THREE.Color( 0x35d0ba ) } );
+	const ghostHeatmap = createHeatmapPlane( aggregateMatrix, { cols: TOKENS.length, cellSize: 0.32, baseColor: new THREE.Color( THEME.accent ) } );
 	ghostHeatmap.position.set( 0, HEATMAP_Y, -0.22 );
 	ghostHeatmap.children.forEach( ( cell ) => { cell.material.transparent = true; cell.material.opacity = 0.08; } );
 	rig.add( ghostHeatmap );
 
 	const concatBar = new THREE.Mesh(
 		new THREE.BoxGeometry( TOKENS.length * SPACING * 0.9, 0.18, 0.5 ),
-		new THREE.MeshStandardMaterial( { color: 0xff5da2, emissive: 0xff5da2, emissiveIntensity: 0.5, transparent: true, opacity: 0.7, roughness: 0.4 } ),
+		new THREE.MeshStandardMaterial( { color: THEME.signal, emissive: THEME.signal, emissiveIntensity: 0.5, transparent: true, opacity: 0.7, roughness: 0.4 } ),
 	);
 	concatBar.position.set( 0, CONCAT_Y, 0 );
 	rig.add( concatBar );
@@ -131,7 +130,7 @@ export function buildAttentionWorld() {
 
 	const woBeam = new THREE.Mesh(
 		new THREE.CylinderGeometry( 0.05, 0.4, 0.5, 24 ),
-		new THREE.MeshStandardMaterial( { color: 0x8b7bff, emissive: 0x8b7bff, emissiveIntensity: 0.6, transparent: true, opacity: 0.8, roughness: 0.35 } ),
+		new THREE.MeshStandardMaterial( { color: THEME.info, emissive: THEME.info, emissiveIntensity: 0.6, transparent: true, opacity: 0.8, roughness: 0.35 } ),
 	);
 	woBeam.position.set( 0, WO_Y, 0 );
 	rig.add( woBeam );
@@ -156,7 +155,7 @@ export function buildAttentionWorld() {
 	} );
 	rig.add( ladderGroup );
 
-	const connector = miniConnector( new THREE.Vector3( 0, WO_Y, 0 ), ladderPos, 0x8b7bff );
+	const connector = miniConnector( new THREE.Vector3( 0, WO_Y, 0 ), ladderPos, THEME.info );
 	rig.add( connector );
 
 	ladderGroup.visible = false;
@@ -255,19 +254,19 @@ export function buildAttentionWorld() {
 		interactables: [ heatmap, ...zOrbs ],
 		totalSteps: ATTENTION_STEPS.length,
 		defaultView: {
-			position: new THREE.Vector3( 0, 1.0, 7.5 ),
-			target: new THREE.Vector3( 0, -0.3, 0 ),
+			position: new THREE.Vector3( 0.6, 1.8, 14.0 ),
+			target: new THREE.Vector3( 0.6, -0.3, 0 ),
 		},
 		getStepView( index ) {
 
 			const views = [
-				{ position: new THREE.Vector3( 0, 2.0, 5.5 ), target: new THREE.Vector3( 0, 1.6, 0 ) },
-				{ position: new THREE.Vector3( 0, 0.9, 4.2 ), target: new THREE.Vector3( 0, 0.4, 0 ) },
-				{ position: new THREE.Vector3( 0, 0, 4.6 ), target: new THREE.Vector3( 0, -0.9, 0 ) },
-				{ position: new THREE.Vector3( 0, -0.4, 4.6 ), target: new THREE.Vector3( 0, -1.7, 0 ) },
-				{ position: new THREE.Vector3( 0, -0.8, 4.6 ), target: new THREE.Vector3( 0, -2.4, 0 ) },
-				{ position: new THREE.Vector3( 1.6, -0.6, 6.2 ), target: new THREE.Vector3( 1.6, -2.7, 0 ) },
-				{ position: new THREE.Vector3( 2.6, -1.6, 4.4 ), target: new THREE.Vector3( 2.6, -3.1, 0 ) },
+				{ position: new THREE.Vector3( 0.6, 2.9, 9.8 ), target: new THREE.Vector3( 0.6, 1.6, 0 ) },
+				{ position: new THREE.Vector3( 0.6, 1.5, 8.0 ), target: new THREE.Vector3( 0.6, 0.4, 0 ) },
+				{ position: new THREE.Vector3( 0.6, 0.3, 8.4 ), target: new THREE.Vector3( 0.6, -0.9, 0 ) },
+				{ position: new THREE.Vector3( 0.6, -0.4, 8.4 ), target: new THREE.Vector3( 0.6, -1.7, 0 ) },
+				{ position: new THREE.Vector3( 0.6, -1.0, 8.4 ), target: new THREE.Vector3( 0.6, -2.4, 0 ) },
+				{ position: new THREE.Vector3( 2.0, -1.2, 11.0 ), target: new THREE.Vector3( 2.0, -2.7, 0 ) },
+				{ position: new THREE.Vector3( 2.6, -2.2, 8.6 ), target: new THREE.Vector3( 2.6, -3.1, 0 ) },
 			];
 			return views[ Math.max( 0, Math.min( views.length - 1, index ) ) ];
 
