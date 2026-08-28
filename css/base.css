@@ -198,6 +198,11 @@ html, body {
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
+	/* A grid item defaults to min-height:auto, so without this the log body
+	   sizes the whole column and pushes .console-foot off the bottom of the
+	   screen once a page prints more than a screenful of trace. */
+	min-height: 0;
+	overflow: hidden;
 	background: var(--panel);
 	border-right: 1px solid var(--line-strong);
 	font-family: var(--font-mono);

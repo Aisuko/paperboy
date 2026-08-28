@@ -5,6 +5,7 @@
 	<title>Cortex — watch a decoder-only Transformer compute</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 	<meta name="description" content="An interactive explainer of a decoder-only Transformer, modelled on GPT-2 small: a live calculation trace on the left, the components doing the work in 3D on the right. Tokenisation, the decoder block, self-attention, the output head, temperature and top-p." />
+	<link rel="icon" href="../../favicon.svg" type="image/svg+xml" />
 	<link rel="stylesheet" href="../../css/base.css" />
 	<link rel="stylesheet" href="css/main.css" />
 </head>
@@ -126,15 +127,15 @@
 				<!-- 01 TOKENISE -->
 				<div class="world" data-world-panel="tokenize">
 					<div class="hud hud-top-left">
-						<div class="eyebrow">01 · From text to vectors</div>
+						<div class="eyebrow">01 &middot; Embeddings</div>
 						<h1>Words become<br /><em>numbers.</em></h1>
 						<p class="lede">
-							<code>"How is the weather today"</code> is split into five GPT-2 byte-pair tokens.
-							Each one maps to an integer ID, and each ID indexes a row of the 768-dimensional
-							embedding matrix. The scatter below projects that 768-d space down to three
-							dimensions so nearby meanings can be seen as nearby points.
+							<code>"How is the weather today"</code> splits into five GPT-2 byte-pair tokens.
+							Each id indexes a row of <code>wte</code>; each position indexes a row of
+							<code>wpe</code>; the two are added elementwise. That sum is the residual
+							stream &mdash; the tensor all twelve blocks read from and write back into.
 						</p>
-						<div class="hint">Drag to orbit &middot; scroll to zoom &middot; click a token</div>
+						<div class="hint">Drag to orbit &middot; scroll to zoom &middot; click any tensor</div>
 					</div>
 				</div>
 
@@ -144,9 +145,10 @@
 						<div class="eyebrow">02 · Inside one decoder block</div>
 						<h1>Six stages,<br />one residual stream.</h1>
 						<p class="lede">
-							GPT-2 normalises on the way <em>into</em> each sub-block &mdash; pre-LN. The
-							original 2017 Transformer normalised after the residual add instead. Same six
-							pieces, different wiring; every diagram here follows GPT-2.
+							The stream runs down the left; each stage hangs off it as the tensors it
+							actually touches. GPT-2 normalises on the way <em>into</em> each sub-block
+							&mdash; pre-LN. The original 2017 Transformer normalised after the residual add
+							instead. Same six pieces, different wiring; every diagram here follows GPT-2.
 						</p>
 					</div>
 					<div class="hud hud-top-right panel step-card" id="block-step-card">

@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { tween, Easing } from './tween.js';
 
 // Shared scene furniture for the "instrument console" theme. Matches the
 // Hurd guide's kit so the two exhibits read as one product: a neutral studio
@@ -117,83 +116,6 @@ export function createLabel( text, className = 'label2d' ) {
 
 }
 
-// A translucent slab used for transformer-block stages (LayerNorm, Attention,
-// MLP, ...) stacked vertically.
-export function createSlab( { width = 3, depth = 2, height = 0.22, color = 0x8b7bff, opacity = 0.55 } = {} ) {
-
-	const geo = new THREE.BoxGeometry( width, height, depth );
-	const mat = new THREE.MeshStandardMaterial( { color, emissive: color, emissiveIntensity: 0.35, roughness: 0.4, metalness: 0.2, transparent: true, opacity } );
-	return new THREE.Mesh( geo, mat );
-
-}
-
-// A grid of coloured cells representing an attention-weight matrix. Cell
-// height is baked into geometry at a fixed `maxCellHeight` and the visible
-// magnitude is driven by `scale.y` (same grow-from-base trick as
-// createBarMesh), so `setHeatmapValues` can repaint a live heatmap (e.g. on
-// attention-head switch) without rebuilding geometry.
-export function createHeatmapPlane( values, { cols, cellSize = 0.32, gap = 0.04, baseColor = new THREE.Color( 0x35d0ba ), maxCellHeight = 0.6 } = {} ) {
-
-	const rows = Math.ceil( values.length / cols );
-	const group = new THREE.Group();
-	const step = cellSize + gap;
-
-	values.forEach( ( v, i ) => {
-
-		const r = Math.floor( i / cols );
-		const c = i % cols;
-		const geo = new THREE.BoxGeometry( cellSize, maxCellHeight, cellSize );
-		geo.translate( 0, maxCellHeight / 2, 0 );
-		const color = baseColor.clone().multiplyScalar( 0.4 + v * 0.9 );
-		const mat = new THREE.MeshStandardMaterial( { color, emissive: color, emissiveIntensity: v * 0.9, roughness: 0.4, metalness: 0.2 } );
-		const cell = new THREE.Mesh( geo, mat );
-		cell.position.set( ( c - ( cols - 1 ) / 2 ) * step, 0, ( r - ( rows - 1 ) / 2 ) * step );
-		cell.scale.y = Math.max( 0.02 / maxCellHeight, v );
-		cell.userData.value = v;
-		group.add( cell );
-
-	} );
-
-	group.userData.maxCellHeight = maxCellHeight;
-	group.userData.baseColor = baseColor;
-	return group;
-
-}
-
-// Tweens an existing createHeatmapPlane group to a new set of values in
-// place — used by the attention world's head selector to repaint the
-// heatmap without rebuilding geometry.
-export function setHeatmapValues( group, values, { duration = 0.5 } = {} ) {
-
-	const maxH = group.userData.maxCellHeight;
-	const baseColor = group.userData.baseColor;
-
-	group.children.forEach( ( cell, i ) => {
-
-		const v = values[ i ];
-		if ( v === undefined ) return;
-
-		const fromScale = cell.scale.y;
-		const toScale = Math.max( 0.02 / maxH, v );
-		const fromColor = cell.material.color.clone();
-		const toColor = baseColor.clone().multiplyScalar( 0.4 + v * 0.9 );
-		const fromEmissive = cell.material.emissiveIntensity;
-		const toEmissive = v * 0.9;
-
-		tween( duration, ( t ) => {
-
-			cell.scale.y = THREE.MathUtils.lerp( fromScale, toScale, t );
-			cell.material.color.copy( fromColor ).lerp( toColor, t );
-			cell.material.emissive.copy( cell.material.color );
-			cell.material.emissiveIntensity = THREE.MathUtils.lerp( fromEmissive, toEmissive, t );
-
-		}, { easing: Easing.cubicInOut } );
-
-		cell.userData.value = v;
-
-	} );
-
-}
 
 // A simple 3D bar (for logit / softmax bars), grows from its base.
 export function createBarMesh( { width = 0.4, depth = 0.4, height = 1, color = 0x8b7bff } = {} ) {
@@ -240,39 +162,6 @@ export function softmaxCurvePoint( curveMesh, prob ) {
 
 }
 
-// A small labelled 3-axis frame + faint base grid, used as a "you are
-// looking at a projection" legend next to a point cloud that actually lives
-// in a much higher-dimensional space (e.g. token embeddings projected from
-// 768d down to 3d on 01 Tokenise).
-export function createAxisFrame( { size = 2, labels = [ 'dim 1', 'dim 2', 'dim 3' ] } = {} ) {
-
-	const group = new THREE.Group();
-	const axes = [
-		{ dir: new THREE.Vector3( 1, 0, 0 ), color: 0xff5da2 },
-		{ dir: new THREE.Vector3( 0, 1, 0 ), color: 0x35d0ba },
-		{ dir: new THREE.Vector3( 0, 0, 1 ), color: 0x8b7bff },
-	];
-
-	axes.forEach( ( axis, i ) => {
-
-		const geo = new THREE.BufferGeometry().setFromPoints( [ new THREE.Vector3(), axis.dir.clone().multiplyScalar( size ) ] );
-		const mat = new THREE.LineBasicMaterial( { color: axis.color, transparent: true, opacity: 0.5 } );
-		group.add( new THREE.Line( geo, mat ) );
-
-		const label = createLabel( labels[ i ], 'label2d label2d-dim' );
-		label.position.copy( axis.dir.clone().multiplyScalar( size * 1.08 ) );
-		group.add( label );
-
-	} );
-
-	const grid = new THREE.GridHelper( size * 1.8, 8, 0x8b7bff, 0x1a1a24 );
-	grid.material.transparent = true;
-	grid.material.opacity = 0.14;
-	group.add( grid );
-
-	return group;
-
-}
 
 // The theme has no starfield any more. Worlds still import this, so it returns
 // an empty group rather than forcing an edit at every call site.

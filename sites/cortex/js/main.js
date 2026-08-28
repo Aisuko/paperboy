@@ -191,7 +191,18 @@ function pickObject( event ) {
 	pointer.x = ( ( event.clientX - rect.left ) / rect.width ) * 2 - 1;
 	pointer.y = -( ( event.clientY - rect.top ) / rect.height ) * 2 + 1;
 	raycaster.setFromCamera( pointer, camera );
-	const hits = raycaster.intersectObjects( worlds[ currentKey ].interactables, true );
+
+	// three.js raycasting ignores `visible`, so a station the page has stepped
+	// away from would still answer clicks aimed at the live one.
+	const hits = raycaster
+		.intersectObjects( worlds[ currentKey ].interactables, true )
+		.filter( ( hit ) => {
+
+			for ( let node = hit.object; node; node = node.parent ) if ( node.visible === false ) return false;
+			return true;
+
+		} );
+
 	return hits.length ? hits[ 0 ].object : null;
 
 }
@@ -253,7 +264,7 @@ function paintTrack( trackEl, index ) {
 // ---------------------------------------------------------------- 01 tokenise
 
 const tokenizeChipsEl = document.getElementById( 'tokenize-chips' );
-const TOKENIZE_STAGES = [ '1. Tokens', '2. Embeddings', '3. Neighbours' ];
+const TOKENIZE_STAGES = [ '1. Token ids', '2. Token embeddings', '3. Positional encoding', '4. Residual stream' ];
 
 TOKENIZE_STAGES.forEach( ( label, i ) => {
 
@@ -267,6 +278,7 @@ TOKENIZE_STAGES.forEach( ( label, i ) => {
 		chip.classList.add( 'active' );
 		worlds.tokenize.showStage( i );
 		logTokenizeStage( i );
+		flyCameraTo( worlds.tokenize.getStepView( i, camera ), 0.8 );
 
 	} );
 	tokenizeChipsEl.appendChild( chip );
@@ -277,23 +289,35 @@ function logTokenizeStage( index ) {
 
 	if ( index === 0 ) {
 
-		proc.write( 'tokens', 'head' );
+		proc.write( 'tokenise', 'head' );
+		proc.write( `input_ids  [1, ${ TOKENS.length }]`, 'dim' );
 		TOKENS.forEach( ( t ) => proc.write( `${ String( t.position ).padEnd( 3 ) } ${ t.display.padEnd( 10 ) } id ${ t.id }`, 'out' ) );
 
 	} else if ( index === 1 ) {
 
-		proc.write( 'embeddings', 'head' );
-		proc.write( `wte[id] + wpe[pos]  →  [1, ${ TOKENS.length }, ${ GPT2.dModel }]`, 'calc' );
+		proc.write( 'token embeddings', 'head' );
+		proc.write( `wte[input_ids]   [${ VOCAB_SIZE.toLocaleString( 'en-AU' ) } × ${ GPT2.dModel }]  →  [1, ${ TOKENS.length }, ${ GPT2.dModel }]`, 'calc' );
+		proc.write( 'a row index, not a matrix multiply', 'dim' );
 		TOKENS.forEach( ( t ) => {
 
 			proc.write( `${ t.display.padEnd( 10 ) } ${ formatVector( t.embedding, { decimals: 2, max: 4, dims: GPT2.dModel } ) }`, 'out' );
 
 		} );
+		proc.write( 'order is not encoded yet — shuffling the tokens gives the same five rows.', 'warn' );
+
+	} else if ( index === 2 ) {
+
+		proc.write( 'positional encoding', 'head' );
+		proc.write( `wpe[0 … ${ TOKENS.length - 1 }]   [${ GPT2.contextLength } × ${ GPT2.dModel }]  →  [1, ${ TOKENS.length }, ${ GPT2.dModel }]`, 'calc' );
+		proc.write( `GPT-2 learns these ${ GPT2.contextLength } rows; the 2017 paper used fixed sinusoids instead.`, 'note' );
+		proc.write( `context limit ${ GPT2.contextLength } tokens — there is no row ${ GPT2.contextLength }.`, 'dim' );
 
 	} else {
 
-		proc.write( 'nearest neighbours', 'head' );
-		proc.write( 'cosine similarity in the projected space — tokens that appear in similar contexts end up pointing in similar directions.', 'note' );
+		proc.write( 'residual stream', 'head' );
+		proc.write( `x = wte[input_ids] + wpe[pos]    [1, ${ TOKENS.length }, ${ GPT2.dModel }]`, 'calc' );
+		proc.write( `→ block 1 of ${ GPT2.nLayer }`, 'ok' );
+		proc.write( 'No sub-block ever overwrites x; each one adds a correction into it. That is what keeps the gradient path to the embedding table short.', 'note' );
 
 	}
 
@@ -310,7 +334,10 @@ function enterTokenize() {
 	logTokenizeStage( 0 );
 	proc.rule();
 	proc.write( 'A leading space is part of the token: " weather" and "weather" are different IDs.', 'note' );
-	flyCameraTo( worlds.tokenize.defaultView, 1.0 );
+
+	worlds.tokenize.showStage( 0 );
+	tokenizeChipsEl.querySelectorAll( '.chip' ).forEach( ( c, i ) => c.classList.toggle( 'active', i === 0 ) );
+	flyCameraTo( worlds.tokenize.getStepView( 0, camera ), 1.0 );
 
 }
 
@@ -361,7 +388,7 @@ function goToBlockStep( index, { append = false } = {} ) {
 	}
 
 	proc.setStatus( `stage ${ blockIndex + 1 }/${ BLOCK_STAGES.length }`, blockIndex === BLOCK_STAGES.length - 1 ? 'done' : 'running' );
-	flyCameraTo( worlds.block.getStepView( blockIndex ), 0.8 );
+	flyCameraTo( worlds.block.getStepView( blockIndex, camera ), 0.8 );
 
 }
 
@@ -415,7 +442,7 @@ function enterBlock() {
 	proc.rule();
 	proc.write( BLOCK_SUMMARY.note, 'note' );
 	proc.setStatus( `stage 1/${ BLOCK_STAGES.length }`, 'running' );
-	flyCameraTo( worlds.block.getStepView( 0 ), 1.0 );
+	flyCameraTo( worlds.block.getStepView( 0, camera ), 1.0 );
 
 }
 
@@ -477,7 +504,7 @@ function goToAttnStep( index, { append = false } = {} ) {
 	}
 
 	proc.setStatus( `step ${ attnIndex + 1 }/${ ATTENTION_STEPS.length }`, attnIndex === ATTENTION_STEPS.length - 1 ? 'done' : 'running' );
-	flyCameraTo( worlds.attention.getStepView( attnIndex ), 0.8 );
+	flyCameraTo( worlds.attention.getStepView( attnIndex, camera ), 0.8 );
 
 }
 
@@ -584,7 +611,7 @@ function enterAttention() {
 	updateAttnUI();
 	printAttnTraceTo( 0 );
 	proc.setStatus( `step 1/${ ATTENTION_STEPS.length }`, 'running' );
-	flyCameraTo( worlds.attention.getStepView( 0 ), 1.0 );
+	flyCameraTo( worlds.attention.getStepView( 0, camera ), 1.0 );
 
 }
 
