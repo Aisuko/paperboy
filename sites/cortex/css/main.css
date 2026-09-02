@@ -1,17 +1,8 @@
-/* Cortex field guide — everything shared lives in ../../css/base.css.
-   This file only holds what is specific to this exhibit. */
-
-/* Only the active page's console controls are shown. */
 .foot-block { display: none; flex-direction: column; gap: 10px; }
-body[data-world="tokenize"] .foot-block[data-foot="tokenize"],
-body[data-world="block"] .foot-block[data-foot="block"],
-body[data-world="attention"] .foot-block[data-foot="attention"],
-body[data-world="output"] .foot-block[data-foot="output"],
-body[data-world="train"] .foot-block[data-foot="train"] { display: flex; }
+body[data-world="mlp"] .foot-block[data-foot="mlp"],
+body[data-world="linear"] .foot-block[data-foot="linear"],
+body[data-world="softmax"] .foot-block[data-foot="softmax"] { display: flex; }
 
-body[data-world="glossary"] .console-foot { display: none; }
-
-/* Panels that carry a derived figure under a table or a paragraph. */
 .metric-note {
 	margin: 10px 0 0;
 	font-family: var(--font-mono);
@@ -20,19 +11,10 @@ body[data-world="glossary"] .console-foot { display: none; }
 	color: var(--accent);
 }
 
-/* 04 Output's live distribution table is dense — tighten it and let the
-   nucleus/dropped state read at a glance. */
-#out-table { margin-top: 2px; }
-#out-table td.tok { color: var(--ink); }
-#out-table tr.is-dropped td { color: var(--ink-faint); }
-#out-table tr.is-argmax td.tok { color: var(--accent); }
-#out-table tr.is-target td.tok::after {
-	content: ' ◂ target';
-	color: var(--signal);
-	font-size: 0.85em;
-	letter-spacing: 0.06em;
-}
+.data-table td.tok { color: var(--ink); }
+.data-table tr.is-dropped td { color: var(--ink-faint); }
+.data-table tr.is-top td.tok { color: var(--accent); }
+.data-table tr.is-sampled td.tok { color: var(--signal); }
+.data-table tr.is-tail td { color: var(--ink-faint); font-style: italic; }
 
-/* The KV-cache panel only makes sense while the Q/K/V steps are on screen. */
-#attn-kv-panel { transition: opacity 0.3s ease; }
-#attn-kv-panel.is-hidden { opacity: 0; pointer-events: none; }
+.step-card pre { color: var(--signal); }

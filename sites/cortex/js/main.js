@@ -6,20 +6,15 @@ import { ProcessConsole } from './utils/console.js';
 import { bindViewport } from './utils/viewport.js';
 import { tweenVec3, updateTweens, Easing } from './utils/tween.js';
 
-import { buildTokenizeWorld } from './worlds/tokenize.js';
-import { buildBlockWorld } from './worlds/block.js';
-import { buildAttentionWorld } from './worlds/attention.js';
-import { buildOutputWorld } from './worlds/output.js';
-import { buildTrainWorld } from './worlds/train.js';
-import { buildGlossaryWorld } from './worlds/glossary.js';
+import { buildMlpWorld } from './worlds/mlp.js';
+import { buildLinearWorld } from './worlds/linear.js';
+import { buildSoftmaxWorld } from './worlds/softmax.js';
 
-import { GPT2, formatVector } from './data/gpt2.js';
-import { INPUT_TEXT, TOKENS, FINAL_HIDDEN_STATE } from './data/tokens.js';
-import { BLOCK_STAGES, BLOCK_SUMMARY } from './data/blockStages.js';
-import { ATTENTION_STEPS, HEAD_COUNT, HEAD_MATRICES, KV_CACHE_NOTE } from './data/attentionSteps.js';
-import { CANDIDATES, VOCAB_SIZE, DEFAULTS, SCORE_TABLE } from './data/vocab.js';
-
-// ---------------------------------------------------------------- renderer
+import { MLP_STEPS, LINEAR_STEPS, SOFTMAX_STEPS } from './data/copy.js';
+import {
+	GPT2, SHOWN, PROMPT, VOCAB_ROWS, DEFAULTS, TAIL_LOGIT,
+	decode, sample, fmt, fmtVec, gelu, W1, W2,
+} from './data/model.js';
 
 const viewport = document.getElementById( 'viewport' );
 const container = document.getElementById( 'webgl' );
@@ -30,48 +25,39 @@ container.appendChild( renderer.domElement );
 const labelRenderer = createLabelRenderer();
 container.appendChild( labelRenderer.domElement );
 
-// A long lens (narrow FOV) keeps the pipeline pages reading like technical
-// drawings rather than perspective photographs.
 const camera = new THREE.PerspectiveCamera( 28, 1, 0.1, 400 );
-camera.position.set( 0.8, 1.8, 14.4 );
+camera.position.set( 0.2, 2.6, 21 );
 
 const controls = new OrbitControls( camera, renderer.domElement );
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.minDistance = 4;
+controls.minDistance = 3;
 controls.maxDistance = 60;
-controls.maxPolarAngle = Math.PI * 0.58;
-controls.target.set( 0, 0, 0 );
+controls.maxPolarAngle = Math.PI * 0.62;
 
 const renderPipeline = createRenderPipeline( renderer );
-
 bindViewport( viewport, camera, [ renderer, labelRenderer ] );
 
-// ---------------------------------------------------------------- worlds
-
 const worlds = {
-	tokenize: buildTokenizeWorld(),
-	block: buildBlockWorld(),
-	attention: buildAttentionWorld(),
-	output: buildOutputWorld(),
-	train: buildTrainWorld(),
-	glossary: buildGlossaryWorld(),
+	mlp: buildMlpWorld(),
+	linear: buildLinearWorld(),
+	softmax: buildSoftmaxWorld(),
 };
 
+const STEPS = { mlp: MLP_STEPS, linear: LINEAR_STEPS, softmax: SOFTMAX_STEPS };
+
+const PLAY_ICON = '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg>';
+const PAUSE_ICON = '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/></svg>';
+
 const sceneOutputs = {};
-for ( const key in worlds ) sceneOutputs[ key ] = buildSceneOutput( worlds[ key ].scene, camera, { strength: 0.24, radius: 0.6, threshold: 0.6 } );
+for ( const key in worlds ) sceneOutputs[ key ] = buildSceneOutput( worlds[ key ].scene, camera, { strength: 0.22, radius: 0.6, threshold: 0.6 } );
 
-let currentKey = 'tokenize';
-renderPipeline.outputNode = sceneOutputs.tokenize;
+let currentKey = 'mlp';
+renderPipeline.outputNode = sceneOutputs.mlp;
 
-function setScene( key ) {
+const proc = new ProcessConsole( document.getElementById( 'console' ) );
 
-	renderPipeline.outputNode = sceneOutputs[ key ];
-	renderPipeline.needsUpdate = true;
-
-}
-
-function flyCameraTo( view, duration = 1.0 ) {
+function flyTo( view, duration = 0.9 ) {
 
 	controls.enabled = false;
 	tweenVec3( camera.position, view.position, duration, { easing: Easing.cubicInOut } );
@@ -82,92 +68,484 @@ function flyCameraTo( view, duration = 1.0 ) {
 
 }
 
-// ---------------------------------------------------------------- console
+/* ------------------------------------------------------------ step cards */
 
-const proc = new ProcessConsole( document.getElementById( 'console' ) );
+function setCard( key, index ) {
 
-// ---------------------------------------------------------------- nav
-
-const navLinks = document.querySelectorAll( '.nav-link' );
-const worldPanels = document.querySelectorAll( '.world' );
-
-function setActiveNav( key ) {
-
-	navLinks.forEach( ( btn ) => btn.classList.toggle( 'active', btn.dataset.goto === key ) );
-	worldPanels.forEach( ( p ) => p.classList.toggle( 'is-active', p.dataset.worldPanel === key ) );
+	const card = document.querySelector( `[data-card="${ key }"]` );
+	const step = STEPS[ key ][ index ];
+	card.querySelector( '[data-role="kicker"]' ).textContent = step.kicker;
+	card.querySelector( '[data-role="num"]' ).textContent = index + 1;
+	card.querySelector( '[data-role="total"]' ).textContent = STEPS[ key ].length;
+	card.querySelector( '[data-role="title"]' ).textContent = step.title;
+	card.querySelector( '[data-role="desc"]' ).textContent = step.desc;
+	card.querySelector( '[data-role="formula"]' ).textContent = step.formula;
 
 }
 
-function setWorldLabelsVisible( key, visible ) {
+/* ------------------------------------------------------------- scrubbers */
 
-	worlds[ key ].scene.traverse( ( obj ) => {
+function makeScrubber( key, count, onStep ) {
 
-		if ( obj.isCSS2DObject ) obj.element.style.display = visible ? '' : 'none';
+	const root = document.querySelector( `.scrubber[data-scrub="${ key }"]` );
+	const track = root.querySelector( '.scrubber-track' );
+	const nodes = [];
+	let index = 0;
+	let timer = null;
+
+	function paint() {
+
+		nodes.forEach( ( n, i ) => {
+
+			n.classList.toggle( 'active', i === index );
+			n.classList.toggle( 'done', i < index );
+
+		} );
+
+	}
+
+	function stop() {
+
+		if ( timer ) { clearInterval( timer ); timer = null; }
+		root.querySelector( '[data-act="play"]' ).innerHTML = PLAY_ICON;
+
+	}
+
+	function go( i ) {
+
+		index = Math.max( 0, Math.min( count - 1, i ) );
+		paint();
+		onStep( index );
+
+	}
+
+	for ( let i = 0; i < count; i ++ ) {
+
+		const node = document.createElement( 'div' );
+		node.className = 'scrubber-node';
+		node.addEventListener( 'click', () => { stop(); go( i ); } );
+		track.appendChild( node );
+		nodes.push( node );
+
+	}
+
+	root.querySelector( '[data-act="prev"]' ).addEventListener( 'click', () => { stop(); go( index - 1 ); } );
+	root.querySelector( '[data-act="next"]' ).addEventListener( 'click', () => { stop(); go( index + 1 ); } );
+	root.querySelector( '[data-act="play"]' ).addEventListener( 'click', ( e ) => {
+
+		if ( timer ) { stop(); return; }
+		e.currentTarget.innerHTML = PAUSE_ICON;
+		if ( index >= count - 1 ) go( 0 );
+		timer = setInterval( () => {
+
+			if ( index >= count - 1 ) { stop(); return; }
+			go( index + 1 );
+
+		}, 3200 );
 
 	} );
 
-}
-
-const ENTER = {
-	tokenize: enterTokenize,
-	block: enterBlock,
-	attention: enterAttention,
-	output: enterOutput,
-	train: enterTrain,
-	glossary: enterGlossary,
-};
-
-function switchWorld( key ) {
-
-	if ( key === currentKey || ! worlds[ key ] ) return;
-
-	stopBlockAutoplay();
-	stopAttnAutoplay();
-	stopOutAutoplay();
-	proc.cancel();
-
-	setWorldLabelsVisible( currentKey, false );
-	currentKey = key;
-	document.body.dataset.world = key;
-	setActiveNav( key );
-	setScene( key );
-	setWorldLabelsVisible( key, true );
-	closeDetail();
-
-	ENTER[ key ]();
+	paint();
+	return { go, stop, get index() { return index; } };
 
 }
 
-navLinks.forEach( ( btn ) => btn.addEventListener( 'click', () => switchWorld( btn.dataset.goto ) ) );
+/* ------------------------------------------------------------ 01 · MLP */
 
-// ---------------------------------------------------------------- detail card
+let mlpToken = PROMPT.length - 1;
+
+const mlpChips = document.getElementById( 'mlp-chips' );
+PROMPT.forEach( ( token, i ) => {
+
+	const chip = document.createElement( 'button' );
+	chip.className = 'chip' + ( i === mlpToken ? ' active' : '' );
+	chip.textContent = `"${ token.trim() }"`;
+	chip.addEventListener( 'click', () => {
+
+		mlpToken = i;
+		[ ...mlpChips.children ].forEach( ( c, j ) => c.classList.toggle( 'active', j === i ) );
+		worlds.mlp.setToken( i );
+		mlpHeader();
+		mlpStepTrace( mlpScrub.index );
+		renderMlpTable();
+
+	} );
+	mlpChips.appendChild( chip );
+
+} );
+
+const mlpScrub = makeScrubber( 'mlp', MLP_STEPS.length, ( i ) => {
+
+	worlds.mlp.setStep( i );
+	setCard( 'mlp', i );
+	mlpStepTrace( i );
+	flyTo( worlds.mlp.getStepView( i ) );
+	renderMlpTable();
+
+} );
+
+function renderMlpTable() {
+
+	const s = worlds.mlp.getState();
+	document.getElementById( 'mlp-table' ).innerHTML = `
+		<tbody>
+			<tr><td>shape</td><td class="num">768 → 3072 → 768</td></tr>
+			<tr><td>drawn</td><td class="num">${ SHOWN.d } → ${ SHOWN.dff } → ${ SHOWN.d }</td></tr>
+			<tr><td>firing</td><td class="num">${ s.fired } / ${ SHOWN.dff }</td></tr>
+			<tr><td>params / block</td><td class="num">4.72 M</td></tr>
+			<tr><td>share of model</td><td class="num">≈ 2 / 3</td></tr>
+		</tbody>`;
+
+}
+
+function mlpHeader() {
+
+	const s = worlds.mlp.getState();
+	proc.clear();
+	proc.setTitle( 'mlp — position-wise feed-forward' );
+	proc.setStatus( 'computed', 'done' );
+	proc.write( `x = residual["${ PROMPT[ mlpToken ].trim() }"]`, 'cmd' );
+	proc.write( `x        ${ fmtVec( s.x ) }`, 'out' );
+	proc.write( `W1       [${ GPT2.dFF } × ${ GPT2.dModel }]   b1 [${ GPT2.dFF }]`, 'dim' );
+	proc.write( `W2       [${ GPT2.dModel } × ${ GPT2.dFF }]   b2 [${ GPT2.dModel }]`, 'dim' );
+	proc.rule();
+
+}
+
+function mlpStepTrace( i ) {
+
+	const s = worlds.mlp.getState();
+	proc.write( `${ i + 1 }. ${ MLP_STEPS[ i ].title }`, 'head' );
+
+	if ( i === 0 ) {
+
+		proc.write( 'y = GELU(x @ W1.T + b1) @ W2.T + b2', 'calc' );
+		proc.write( `${ GPT2.dModel } → ${ GPT2.dFF } → ${ GPT2.dModel }  ·  applied to every position separately, with the same weights`, 'out' );
+
+	} else if ( i === 1 ) {
+
+		proc.write( 'attention:  out_t = Σs α[t,s] · v_s        <b>linear</b> in v', 'out' );
+		proc.write( 'two linear maps in a row collapse into one matrix', 'warn' );
+		proc.write( 'GELU between them is what stops that collapse', 'calc' );
+
+	} else if ( i === 2 ) {
+
+		const terms = W1[ 0 ].map( ( w, d ) => w * s.x[ d ] );
+		proc.write( `pre[0] = Σ W1[0,d]·x[d] + b1[0]`, 'cmd' );
+		proc.write( `       = ${ terms.slice( 0, 4 ).map( ( t ) => fmt( t, 2 ) ).join( ' + ' ) } + … = ${ fmt( s.pre[ 0 ], 4 ) }`, 'calc' );
+		proc.write( `pre      ${ fmtVec( s.pre, 2, 8 ) }`, 'out' );
+		proc.write( `range    ${ fmt( Math.min( ...s.pre ), 3 ) } … ${ fmt( Math.max( ...s.pre ), 3 ) }`, 'dim' );
+
+	} else if ( i === 3 ) {
+
+		proc.write( 'act = GELU(pre)', 'cmd' );
+		proc.write( `GELU(${ fmt( s.pre[ 0 ], 2 ) }) = ${ fmt( gelu( s.pre[ 0 ] ), 4 ) }`, 'calc' );
+		proc.write( `firing   ${ s.fired } of ${ SHOWN.dff } drawn neurons pass 0.05`, 'ok' );
+		proc.write( 'negative pre-activations are gated toward zero — the layer is sparse', 'out' );
+
+	} else if ( i === 4 ) {
+
+		const j = s.act.indexOf( Math.max( ...s.act ) );
+		proc.write( 'y = Σj act[j] · W2[:,j] + b2', 'cmd' );
+		proc.write( `loudest  neuron ${ j }  act ${ fmt( s.act[ j ], 3 ) }  writes ${ fmtVec( W2.map( ( row ) => row[ j ] * s.act[ j ] ), 2 ) }`, 'calc' );
+		proc.write( `y        ${ fmtVec( s.y ) }`, 'out' );
+
+	} else {
+
+		proc.write( 'x ← x + MLP(LayerNorm(x))', 'cmd' );
+		proc.write( `x + y    ${ fmtVec( s.out ) }`, 'ok' );
+		proc.write( `params   2 · ${ GPT2.dModel } · ${ GPT2.dFF } = 4.72M per block × ${ GPT2.layers } = 56.7M`, 'dim' );
+		proc.write( 'that is about two thirds of every non-embedding parameter in GPT-2 small', 'note' );
+
+	}
+
+}
+
+/* -------------------------------------------------------- 02 · LM head */
+
+const mixSlider = document.getElementById( 'mix-slider' );
+const mixReadout = document.getElementById( 'mix-readout' );
+
+mixSlider.addEventListener( 'input', () => {
+
+	const v = parseFloat( mixSlider.value );
+	mixReadout.textContent = v.toFixed( 2 );
+	worlds.linear.setMix( v );
+	renderLinTable();
+
+} );
+
+mixSlider.addEventListener( 'change', () => {
+
+	const s = worlds.linear.getState();
+	const best = s.logits.indexOf( Math.max( ...s.logits ) );
+	proc.write( `mix ${ s.mix.toFixed( 2 ) }  →  argmax "${ VOCAB_ROWS[ best ].token.trim() }"  logit ${ fmt( s.logits[ best ], 3 ) }`, 'calc' );
+
+} );
+
+const linScrub = makeScrubber( 'linear', LINEAR_STEPS.length, ( i ) => {
+
+	worlds.linear.setStep( i );
+	setCard( 'linear', i );
+	linStepTrace( i );
+	flyTo( worlds.linear.getStepView( i ) );
+	renderLinTable();
+
+} );
+
+function renderLinTable() {
+
+	const s = worlds.linear.getState();
+	const rows = VOCAB_ROWS.map( ( r, v ) => ( { token: r.token, z: s.logits[ v ] } ) ).sort( ( a, b ) => b.z - a.z ).slice( 0, 5 );
+	document.getElementById( 'lin-table' ).innerHTML = `
+		<thead><tr><th>token</th><th>logit</th></tr></thead>
+		<tbody>${ rows.map( ( r, i ) => `<tr class="${ i === 0 ? 'is-top' : '' }"><td class="tok">${ r.token }</td><td class="num">${ fmt( r.z, 3 ) }</td></tr>` ).join( '' ) }</tbody>`;
+
+}
+
+function linHeader() {
+
+	proc.clear();
+	proc.setTitle( 'lm_head — the output linear layer' );
+	proc.setStatus( 'computed', 'done' );
+	proc.write( 'logits = h @ lm_head.weight.T', 'cmd' );
+	proc.write( `h        ${ fmtVec( worlds.linear.getState().hidden ) }   (${ SHOWN.d } of ${ GPT2.dModel })`, 'out' );
+	proc.write( `weight   [${ GPT2.vocab.toLocaleString( 'en-AU' ) } × ${ GPT2.dModel }]  ·  tied to wte  ·  no bias`, 'dim' );
+	proc.rule();
+
+}
+
+function linStepTrace( i ) {
+
+	const s = worlds.linear.getState();
+	proc.write( `${ i + 1 }. ${ LINEAR_STEPS[ i ].title }`, 'head' );
+
+	if ( i === 0 ) {
+
+		proc.write( `${ GPT2.dModel } × ${ GPT2.vocab.toLocaleString( 'en-AU' ) } = 38.6M weights — more than every attention matrix in the model put together (28.3M)`, 'out' );
+		proc.write( 'no activation, no bias, nothing after it but softmax', 'dim' );
+
+	} else if ( i === 1 ) {
+
+		proc.write( 'the trunk has no notion of words — only 768 continuous numbers', 'out' );
+		proc.write( 'this layer is the only place the vocabulary re-enters after the input embedding', 'note' );
+
+	} else if ( i === 2 ) {
+
+		VOCAB_ROWS.slice( 0, 5 ).forEach( ( r, v ) => proc.write( `h · e["${ r.token.trim() }"]${ ' '.repeat( Math.max( 0, 8 - r.token.length ) ) } = ${ fmt( s.logits[ v ], 4 ) }`, v === 0 ? 'calc' : 'out' ) );
+		proc.write( `lowest drawn row  ${ fmt( Math.min( ...s.logits ), 4 ) }`, 'dim' );
+
+	} else if ( i === 3 ) {
+
+		proc.write( 'logit = |h| |e| cosθ', 'cmd' );
+		proc.write( `|h| = ${ fmt( Math.hypot( ...s.hidden ), 3 ) }  ·  the ranking is the ordering of cosθ scaled by each row's length`, 'out' );
+		proc.write( 'drag the slider to rotate h — every logit moves, no weights change', 'note' );
+
+	} else {
+
+		proc.write( 'trunk = 12 decoder blocks   →   head = one task-specific layer', 'out' );
+		proc.write( 'lm_head.weight is wte.weight — a logit is how much h looks like that token’s embedding', 'calc' );
+		proc.write( 'swap the head for Linear(768, 2) and the same trunk does classification', 'note' );
+
+	}
+
+}
+
+/* -------------------------------------------------------- 03 · softmax */
+
+const params = { ...DEFAULTS };
+let smResult = decode( params );
+
+const tempSlider = document.getElementById( 'temp-slider' );
+const kSlider = document.getElementById( 'k-slider' );
+const pSlider = document.getElementById( 'p-slider' );
+const modeChips = document.getElementById( 'mode-chips' );
+
+function syncModeChips() {
+
+	[ ...modeChips.children ].forEach( ( c ) => c.classList.toggle( 'active', c.dataset.mode === params.mode ) );
+
+}
+
+function refreshSoftmax() {
+
+	smResult = decode( params );
+	worlds.softmax.setResult( smResult );
+	renderSmTable();
+
+}
+
+function renderSmTable() {
+
+	const rows = [ ...smResult.rows.slice( 0, 6 ), smResult.tail ];
+	document.getElementById( 'sm-table' ).innerHTML = `
+		<thead><tr><th>token</th><th>p</th><th>after</th></tr></thead>
+		<tbody>${ rows.map( ( r ) => {
+
+			const cls = [ r.isTail ? 'is-tail' : '', ! r.kept ? 'is-dropped' : '', r === smResult.rows[ 0 ] ? 'is-top' : '' ].join( ' ' );
+			return `<tr class="${ cls }"><td class="tok">${ r.isTail ? '50,245 others' : r.token }</td><td class="num">${ r.prob.toFixed( 4 ) }</td><td class="num">${ r.kept ? r.final.toFixed( 4 ) : '—' }</td></tr>`;
+
+		} ).join( '' ) }</tbody>`;
+
+	document.getElementById( 'sm-summary' ).textContent =
+		`T ${ smResult.temperature.toFixed( 2 ) } · ${ smResult.mode === 'none' ? 'no filter' : smResult.mode === 'both' ? `k ${ params.topK } + p ${ params.topP.toFixed( 2 ) }` : smResult.mode === 'k' ? `k ${ params.topK }` : `p ${ params.topP.toFixed( 2 ) }` } · ${ smResult.keptCount.toLocaleString( 'en-AU' ) } kept · H ${ smResult.entropy.toFixed( 3 ) } nats`;
+
+}
+
+tempSlider.addEventListener( 'input', () => {
+
+	params.temperature = parseFloat( tempSlider.value );
+	document.getElementById( 'temp-readout' ).textContent = params.temperature.toFixed( 2 );
+	refreshSoftmax();
+
+} );
+
+kSlider.addEventListener( 'input', () => {
+
+	params.topK = parseInt( kSlider.value, 10 );
+	document.getElementById( 'k-readout' ).textContent = params.topK;
+	refreshSoftmax();
+
+} );
+
+pSlider.addEventListener( 'input', () => {
+
+	params.topP = parseFloat( pSlider.value );
+	document.getElementById( 'p-readout' ).textContent = params.topP.toFixed( 2 );
+	refreshSoftmax();
+
+} );
+
+[ tempSlider, kSlider, pSlider ].forEach( ( el ) => el.addEventListener( 'change', () => {
+
+	proc.write( `T ${ smResult.temperature.toFixed( 2 ) } · k ${ params.topK } · p ${ params.topP.toFixed( 2 ) }  →  ${ smResult.keptCount.toLocaleString( 'en-AU' ) } candidates, top p = ${ smResult.rows[ 0 ].final.toFixed( 4 ) }`, 'calc' );
+
+} ) );
+
+modeChips.addEventListener( 'click', ( e ) => {
+
+	const btn = e.target.closest( '.chip' );
+	if ( ! btn ) return;
+	params.mode = btn.dataset.mode;
+	syncModeChips();
+	refreshSoftmax();
+	proc.write( `filter = ${ params.mode === 'none' ? 'none' : params.mode === 'both' ? 'top-k then top-p' : params.mode === 'k' ? 'top-k' : 'top-p' }  →  ${ smResult.keptCount.toLocaleString( 'en-AU' ) } candidates`, 'warn' );
+
+} );
+
+document.getElementById( 'sample-btn' ).addEventListener( 'click', () => {
+
+	const row = sample( smResult );
+	const index = smResult.all.indexOf( row );
+	worlds.softmax.setSampled( index );
+	proc.write( `sample() → ${ row.isTail ? 'one of the 50,245 tail tokens' : `"${ row.token.trim() }"` }   p = ${ row.final.toFixed( 4 ) }`, 'ok' );
+
+} );
+
+const smScrub = makeScrubber( 'softmax', SOFTMAX_STEPS.length, ( i ) => {
+
+	const mode = i === 4 ? 'k' : i === 5 ? 'p' : i === 6 ? 'both' : 'none';
+	params.mode = mode;
+	syncModeChips();
+	refreshSoftmax();
+	worlds.softmax.setStep( i );
+	setCard( 'softmax', i );
+	smStepTrace( i );
+	flyTo( worlds.softmax.getStepView( i ) );
+
+} );
+
+function smHeader() {
+
+	proc.clear();
+	proc.setTitle( 'softmax — logits to a distribution' );
+	proc.setStatus( 'computed', 'done' );
+	proc.write( 'probs = softmax(logits / T)', 'cmd' );
+	proc.write( `logits   ${ SHOWN.vocab } drawn of ${ GPT2.vocab.toLocaleString( 'en-AU' ) }`, 'dim' );
+	proc.write( `tail     the other ${ smResult.tailCount.toLocaleString( 'en-AU' ) } modelled at z ≈ ${ fmt( TAIL_LOGIT, 2 ) }, drawn as one bar`, 'dim' );
+	proc.write( 'these are the logits page 02 produces with h unsteered', 'dim' );
+	proc.rule();
+
+}
+
+function smStepTrace( i ) {
+
+	const r = smResult;
+	proc.write( `${ i + 1 }. ${ SOFTMAX_STEPS[ i ].title }`, 'head' );
+
+	if ( i === 0 ) {
+
+		proc.write( `z        ${ fmtVec( r.rows.map( ( x ) => x.logit ), 2, 8 ) }`, 'out' );
+		proc.write( `max z    ${ fmt( r.rows[ 0 ].logit, 3 ) }   ·   softmax is unchanged if you subtract it from every score`, 'calc' );
+
+	} else if ( i === 1 ) {
+
+		proc.write( `exp(z−max)  ${ fmtVec( r.rows.map( ( x ) => x.exp ), 3, 6 ) }`, 'calc' );
+		proc.write( `a gap of 1.0 in logits is a factor of e = 2.718 in probability`, 'out' );
+
+	} else if ( i === 2 ) {
+
+		proc.write( `Σ exp = ${ ( r.rows.reduce( ( s, x ) => s + x.exp, 0 ) + r.tail.exp ).toFixed( 4 ) }`, 'cmd' );
+		r.rows.slice( 0, 4 ).forEach( ( x ) => proc.write( `p("${ x.token.trim() }")${ ' '.repeat( Math.max( 0, 8 - x.token.length ) ) } = ${ x.prob.toFixed( 4 ) }`, 'out' ) );
+		proc.write( `Σ p = ${ ( r.rows.reduce( ( s, x ) => s + x.prob, 0 ) + r.tail.prob ).toFixed( 6 ) }`, 'ok' );
+
+	} else if ( i === 3 ) {
+
+		[ 0.5, 1, 1.6 ].forEach( ( T ) => {
+
+			const d = decode( { ...params, temperature: T, mode: 'none' } );
+			proc.write( `T = ${ T.toFixed( 1 ) }   top p = ${ d.rows[ 0 ].prob.toFixed( 4 ) }   H = ${ d.entropy.toFixed( 3 ) } nats`, T === 1 ? 'calc' : 'out' );
+
+		} );
+		proc.write( 'temperature rescales scores — every candidate survives it', 'note' );
+		proc.write( `at T = 2 the ${ r.tailCount.toLocaleString( 'en-AU' ) } tail tokens hold ${ ( decode( { ...params, temperature: 2, mode: 'none' } ).tail.prob * 100 ).toFixed( 1 ) }% of the mass — flattening feeds the unlikely`, 'warn' );
+
+	} else if ( i === 4 ) {
+
+		proc.write( `top-k  k = ${ params.topK }`, 'cmd' );
+		proc.write( `kept     ${ r.rows.filter( ( x ) => x.kept ).map( ( x ) => x.token.trim() ).join( ', ' ) }`, 'out' );
+		proc.write( `mass before renormalising  ${ r.keptMass.toFixed( 4 ) }  →  1.000`, 'calc' );
+		proc.write( 'k is fixed: the same width whether the model is sure or not', 'note' );
+
+	} else if ( i === 5 ) {
+
+		proc.write( `top-p  p = ${ params.topP.toFixed( 2 ) }`, 'cmd' );
+		const kept = r.all.filter( ( x ) => x.kept );
+		kept.forEach( ( x ) => proc.write( `  ${ ( x.isTail ? 'tail' : x.token.trim() ).padEnd( 8 ) } p ${ x.prob.toFixed( 4 ) }   cum ${ x.cum.toFixed( 4 ) }`, 'out' ) );
+		proc.write( `nucleus  ${ r.keptCount.toLocaleString( 'en-AU' ) } tokens, mass ${ r.keptMass.toFixed( 4 ) } ≥ ${ params.topP.toFixed( 2 ) }`, 'ok' );
+		proc.write( 'the count adapts to how confident the step is', 'note' );
+
+	} else {
+
+		proc.write( 'z / T  →  softmax  →  top-k  →  top-p  →  renormalise  →  sample', 'cmd' );
+		proc.write( 'implementations set the rejected logits to −inf and softmax once — same result', 'dim' );
+		proc.write( `now: T ${ r.temperature.toFixed( 2 ) } · k ${ params.topK } · p ${ params.topP.toFixed( 2 ) } · ${ r.keptCount.toLocaleString( 'en-AU' ) } candidates`, 'calc' );
+		proc.write( 'neither filter is part of softmax — both act on what it produced', 'warn' );
+
+	}
+
+}
+
+/* ------------------------------------------------------------- detail card */
 
 const detailCard = document.getElementById( 'detail-card' );
-const detailCategory = document.getElementById( 'detail-category' );
-const detailName = document.getElementById( 'detail-name' );
-const detailBlurb = document.getElementById( 'detail-blurb' );
-const detailDescription = document.getElementById( 'detail-description' );
-const detailMetricBlock = document.getElementById( 'detail-metric-block' );
-const detailMetricLabel = document.getElementById( 'detail-metric-label' );
-const detailMetric = document.getElementById( 'detail-metric' );
 document.getElementById( 'detail-close' ).addEventListener( 'click', closeDetail );
 
 function openDetail( payload ) {
 
-	detailCategory.textContent = payload.category || '';
-	detailName.textContent = payload.name || '';
-	detailBlurb.textContent = payload.blurb || '';
-	detailDescription.textContent = payload.description || '';
-
+	if ( ! payload ) return;
+	document.getElementById( 'detail-category' ).textContent = payload.category || '';
+	document.getElementById( 'detail-name' ).textContent = payload.name || '';
+	document.getElementById( 'detail-blurb' ).textContent = payload.blurb || '';
+	document.getElementById( 'detail-description' ).textContent = payload.description || '';
 	const hasMetric = Boolean( payload.metric );
-	detailMetricBlock.classList.toggle( 'hidden', ! hasMetric );
+	document.getElementById( 'detail-metric-block' ).classList.toggle( 'hidden', ! hasMetric );
 	if ( hasMetric ) {
 
-		detailMetricLabel.textContent = payload.metricLabel || 'Value';
-		detailMetric.textContent = payload.metric;
+		document.getElementById( 'detail-metric-label' ).textContent = payload.metricLabel || 'Value';
+		document.getElementById( 'detail-metric' ).textContent = payload.metric;
 
 	}
-
 	detailCard.classList.add( 'open' );
 	detailCard.setAttribute( 'aria-hidden', 'false' );
 
@@ -180,702 +558,136 @@ function closeDetail() {
 
 }
 
-// ---------------------------------------------------------------- picking
-
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 
-function pickObject( event ) {
+function visibleChain( object ) {
+
+	let o = object;
+	while ( o ) { if ( ! o.visible ) return false; o = o.parent; }
+	return true;
+
+}
+
+renderer.domElement.addEventListener( 'pointerdown', ( event ) => {
 
 	const rect = renderer.domElement.getBoundingClientRect();
 	pointer.x = ( ( event.clientX - rect.left ) / rect.width ) * 2 - 1;
 	pointer.y = -( ( event.clientY - rect.top ) / rect.height ) * 2 + 1;
 	raycaster.setFromCamera( pointer, camera );
 
-	// three.js raycasting ignores `visible`, so a station the page has stepped
-	// away from would still answer clicks aimed at the live one.
-	const hits = raycaster
-		.intersectObjects( worlds[ currentKey ].interactables, true )
-		.filter( ( hit ) => {
+	const hits = raycaster.intersectObjects( worlds[ currentKey ].interactables, true ).filter( ( h ) => {
 
-			for ( let node = hit.object; node; node = node.parent ) if ( node.visible === false ) return false;
-			return true;
+		const u = h.object.userData;
+		return visibleChain( h.object ) && ( u.index !== undefined || u.row !== undefined || u.rank !== undefined );
 
-		} );
+	} );
 
-	return hits.length ? hits[ 0 ].object : null;
-
-}
-
-renderer.domElement.addEventListener( 'pointermove', ( event ) => {
-
-	renderer.domElement.style.cursor = pickObject( event ) ? 'pointer' : 'grab';
+	if ( ! hits.length ) return;
+	openDetail( worlds[ currentKey ].describe( hits[ 0 ].object ) );
 
 } );
 
-renderer.domElement.addEventListener( 'click', ( event ) => {
+/* ------------------------------------------------------------------- nav */
 
-	const hit = pickObject( event );
-	if ( ! hit ) { closeDetail(); return; }
+const navLinks = document.querySelectorAll( '.nav-link' );
+const worldPanels = document.querySelectorAll( '.world' );
 
-	if ( currentKey === 'block' ) {
+function setWorldLabelsVisible( key, visible ) {
 
-		let node = hit;
-		while ( node && node.userData.stepIndex === undefined ) node = node.parent;
-		if ( node ) { stopBlockAutoplay(); goToBlockStep( node.userData.stepIndex ); }
+	worlds[ key ].scene.traverse( ( obj ) => {
 
-	}
-
-	let detailNode = hit;
-	while ( detailNode && ! detailNode.userData.detail ) detailNode = detailNode.parent;
-	if ( detailNode ) openDetail( detailNode.userData.detail );
-
-} );
-
-const PLAY_ICON = '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg>';
-const PAUSE_ICON = '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/></svg>';
-
-function buildTrack( trackEl, items, onClick ) {
-
-	trackEl.innerHTML = '';
-	items.forEach( ( item, i ) => {
-
-		const node = document.createElement( 'div' );
-		node.className = 'scrubber-node';
-		node.title = item.title;
-		node.addEventListener( 'click', () => onClick( i ) );
-		trackEl.appendChild( node );
+		if ( obj.isCSS2DObject ) obj.element.style.display = visible ? '' : 'none';
 
 	} );
 
 }
 
-function paintTrack( trackEl, index ) {
+const ENTER = { mlp: enterMlp, linear: enterLinear, softmax: enterSoftmax };
 
-	[ ...trackEl.children ].forEach( ( node, i ) => {
+function switchWorld( key ) {
 
-		node.classList.toggle( 'active', i === index );
-		node.classList.toggle( 'done', i < index );
+	if ( key === currentKey || ! worlds[ key ] ) return;
 
-	} );
+	mlpScrub.stop();
+	linScrub.stop();
+	smScrub.stop();
+	proc.cancel();
+	closeDetail();
 
-}
+	setWorldLabelsVisible( currentKey, false );
+	currentKey = key;
+	document.body.dataset.world = key;
+	navLinks.forEach( ( b ) => b.classList.toggle( 'active', b.dataset.goto === key ) );
+	worldPanels.forEach( ( p ) => p.classList.toggle( 'is-active', p.dataset.worldPanel === key ) );
 
-// ---------------------------------------------------------------- 01 tokenise
+	renderPipeline.outputNode = sceneOutputs[ key ];
+	renderPipeline.needsUpdate = true;
+	setWorldLabelsVisible( key, true );
 
-const tokenizeChipsEl = document.getElementById( 'tokenize-chips' );
-const TOKENIZE_STAGES = [ '1. Token ids', '2. Token embeddings', '3. Positional encoding', '4. Residual stream' ];
-
-TOKENIZE_STAGES.forEach( ( label, i ) => {
-
-	const chip = document.createElement( 'button' );
-	chip.type = 'button';
-	chip.className = 'chip' + ( i === 0 ? ' active' : '' );
-	chip.textContent = label;
-	chip.addEventListener( 'click', () => {
-
-		tokenizeChipsEl.querySelectorAll( '.chip' ).forEach( ( c ) => c.classList.remove( 'active' ) );
-		chip.classList.add( 'active' );
-		worlds.tokenize.showStage( i );
-		logTokenizeStage( i );
-		flyCameraTo( worlds.tokenize.getStepView( i, camera ), 0.8 );
-
-	} );
-	tokenizeChipsEl.appendChild( chip );
-
-} );
-
-function logTokenizeStage( index ) {
-
-	if ( index === 0 ) {
-
-		proc.write( 'tokenise', 'head' );
-		proc.write( `input_ids  [1, ${ TOKENS.length }]`, 'dim' );
-		TOKENS.forEach( ( t ) => proc.write( `${ String( t.position ).padEnd( 3 ) } ${ t.display.padEnd( 10 ) } id ${ t.id }`, 'out' ) );
-
-	} else if ( index === 1 ) {
-
-		proc.write( 'token embeddings', 'head' );
-		proc.write( `wte[input_ids]   [${ VOCAB_SIZE.toLocaleString( 'en-AU' ) } × ${ GPT2.dModel }]  →  [1, ${ TOKENS.length }, ${ GPT2.dModel }]`, 'calc' );
-		proc.write( 'a row index, not a matrix multiply', 'dim' );
-		TOKENS.forEach( ( t ) => {
-
-			proc.write( `${ t.display.padEnd( 10 ) } ${ formatVector( t.embedding, { decimals: 2, max: 4, dims: GPT2.dModel } ) }`, 'out' );
-
-		} );
-		proc.write( 'order is not encoded yet — shuffling the tokens gives the same five rows.', 'warn' );
-
-	} else if ( index === 2 ) {
-
-		proc.write( 'positional encoding', 'head' );
-		proc.write( `wpe[0 … ${ TOKENS.length - 1 }]   [${ GPT2.contextLength } × ${ GPT2.dModel }]  →  [1, ${ TOKENS.length }, ${ GPT2.dModel }]`, 'calc' );
-		proc.write( `GPT-2 learns these ${ GPT2.contextLength } rows; the 2017 paper used fixed sinusoids instead.`, 'note' );
-		proc.write( `context limit ${ GPT2.contextLength } tokens — there is no row ${ GPT2.contextLength }.`, 'dim' );
-
-	} else {
-
-		proc.write( 'residual stream', 'head' );
-		proc.write( `x = wte[input_ids] + wpe[pos]    [1, ${ TOKENS.length }, ${ GPT2.dModel }]`, 'calc' );
-		proc.write( `→ block 1 of ${ GPT2.nLayer }`, 'ok' );
-		proc.write( 'No sub-block ever overwrites x; each one adds a correction into it. That is what keeps the gradient path to the embedding table short.', 'note' );
-
-	}
+	ENTER[ key ]();
 
 }
 
-function enterTokenize() {
+navLinks.forEach( ( btn ) => btn.addEventListener( 'click', () => switchWorld( btn.dataset.goto ) ) );
 
-	proc.clear();
-	proc.setTitle( 'forward pass — tokenise' );
-	proc.setStatus( 'ready', 'done' );
-	proc.write( `model.encode("${ INPUT_TEXT }")`, 'cmd' );
-	proc.write( `${ GPT2.name } · ${ GPT2.parameters } params · vocab ${ VOCAB_SIZE.toLocaleString( 'en-AU' ) } · d_model ${ GPT2.dModel }`, 'dim' );
-	proc.rule();
-	logTokenizeStage( 0 );
-	proc.rule();
-	proc.write( 'A leading space is part of the token: " weather" and "weather" are different IDs.', 'note' );
+function enterMlp() {
 
-	worlds.tokenize.showStage( 0 );
-	tokenizeChipsEl.querySelectorAll( '.chip' ).forEach( ( c, i ) => c.classList.toggle( 'active', i === 0 ) );
-	flyCameraTo( worlds.tokenize.getStepView( 0, camera ), 1.0 );
+	mlpHeader();
+	mlpStepTrace( mlpScrub.index );
+	setCard( 'mlp', mlpScrub.index );
+	worlds.mlp.setStep( mlpScrub.index );
+	renderMlpTable();
+	flyTo( worlds.mlp.getStepView( mlpScrub.index ) );
 
 }
 
-// ---------------------------------------------------------------- 02 block
+function enterLinear() {
 
-const blockTrack = document.getElementById( 'block-track' );
-const blockStepNum = document.getElementById( 'block-step-num' );
-const blockStepTotal = document.getElementById( 'block-step-total' );
-const blockStepTitle = document.getElementById( 'block-step-title' );
-const blockStepDesc = document.getElementById( 'block-step-desc' );
-const blockStepFormula = document.getElementById( 'block-step-formula' );
-const blockPlay = document.getElementById( 'block-play' );
-
-let blockIndex = 0;
-let blockAutoplayTimer = null;
-
-blockStepTotal.textContent = String( BLOCK_STAGES.length );
-
-function updateBlockUI() {
-
-	const stage = BLOCK_STAGES[ blockIndex ];
-	blockStepNum.textContent = String( blockIndex + 1 );
-	blockStepTitle.textContent = stage.title;
-	blockStepDesc.textContent = stage.description;
-	blockStepFormula.textContent = stage.formula;
-	paintTrack( blockTrack, blockIndex );
+	worlds.linear.setStep( linScrub.index );
+	linHeader();
+	linStepTrace( linScrub.index );
+	setCard( 'linear', linScrub.index );
+	renderLinTable();
+	flyTo( worlds.linear.getStepView( linScrub.index ) );
 
 }
 
-function goToBlockStep( index, { append = false } = {} ) {
+function enterSoftmax() {
 
-	const next = Math.max( 0, Math.min( BLOCK_STAGES.length - 1, index ) );
-	const forwardOne = append && next === blockIndex + 1;
-	blockIndex = next;
-
-	worlds.block.goToStep( blockIndex );
-	updateBlockUI();
-
-	if ( forwardOne ) {
-
-		proc.write( `${ blockIndex + 1 }. ${ BLOCK_STAGES[ blockIndex ].title }`, 'head' );
-		proc.writeAll( BLOCK_STAGES[ blockIndex ].trace );
-
-	} else {
-
-		printBlockTraceTo( blockIndex );
-
-	}
-
-	proc.setStatus( `stage ${ blockIndex + 1 }/${ BLOCK_STAGES.length }`, blockIndex === BLOCK_STAGES.length - 1 ? 'done' : 'running' );
-	flyCameraTo( worlds.block.getStepView( blockIndex, camera ), 0.8 );
+	refreshSoftmax();
+	worlds.softmax.setStep( smScrub.index );
+	smHeader();
+	smStepTrace( smScrub.index );
+	setCard( 'softmax', smScrub.index );
+	flyTo( worlds.softmax.getStepView( smScrub.index ) );
 
 }
 
-function printBlockTraceTo( index ) {
-
-	proc.clear();
-	proc.write( `block 1 of ${ GPT2.nLayer }  ·  ${ BLOCK_SUMMARY.flow }`, 'dim' );
-	proc.rule();
-	for ( let i = 0; i <= index; i ++ ) {
-
-		proc.write( `${ i + 1 }. ${ BLOCK_STAGES[ i ].title }`, 'head' );
-		proc.writeAll( BLOCK_STAGES[ i ].trace );
-
-	}
-
-}
-
-function stopBlockAutoplay() {
-
-	if ( blockAutoplayTimer ) { clearInterval( blockAutoplayTimer ); blockAutoplayTimer = null; blockPlay.innerHTML = PLAY_ICON; }
-
-}
-
-document.getElementById( 'block-prev' ).addEventListener( 'click', () => { stopBlockAutoplay(); goToBlockStep( blockIndex - 1 ); } );
-document.getElementById( 'block-next' ).addEventListener( 'click', () => { stopBlockAutoplay(); goToBlockStep( blockIndex + 1, { append: true } ); } );
-blockPlay.addEventListener( 'click', () => {
-
-	if ( blockAutoplayTimer ) { stopBlockAutoplay(); return; }
-	if ( blockIndex >= BLOCK_STAGES.length - 1 ) goToBlockStep( 0 );
-
-	blockPlay.innerHTML = PAUSE_ICON;
-	blockAutoplayTimer = setInterval( () => {
-
-		if ( blockIndex >= BLOCK_STAGES.length - 1 ) { stopBlockAutoplay(); return; }
-		goToBlockStep( blockIndex + 1, { append: true } );
-
-	}, 2600 );
-
-} );
-
-buildTrack( blockTrack, BLOCK_STAGES, ( i ) => { stopBlockAutoplay(); goToBlockStep( i ); } );
-updateBlockUI();
-
-function enterBlock() {
-
-	proc.setTitle( 'forward pass — decoder block' );
-	blockIndex = 0;
-	worlds.block.goToStep( 0 );
-	updateBlockUI();
-	printBlockTraceTo( 0 );
-	proc.rule();
-	proc.write( BLOCK_SUMMARY.note, 'note' );
-	proc.setStatus( `stage 1/${ BLOCK_STAGES.length }`, 'running' );
-	flyCameraTo( worlds.block.getStepView( 0, camera ), 1.0 );
-
-}
-
-// ---------------------------------------------------------------- 03 attention
-
-const attnTrack = document.getElementById( 'attn-track' );
-const attnStepNum = document.getElementById( 'attn-step-num' );
-const attnStepTotal = document.getElementById( 'attn-step-total' );
-const attnStepTitle = document.getElementById( 'attn-step-title' );
-const attnStepDesc = document.getElementById( 'attn-step-desc' );
-const attnStepEquations = document.getElementById( 'attn-step-equations' );
-const attnPlay = document.getElementById( 'attn-play' );
-const attnKvPanel = document.getElementById( 'attn-kv-panel' );
-const attnKvCopy = document.getElementById( 'attn-kv-copy' );
-const attnKvOps = document.getElementById( 'attn-kv-ops' );
-const attnKvChipsEl = document.getElementById( 'attn-kv-chips' );
-const attnHeadSlider = document.getElementById( 'attn-head-slider' );
-const attnHeadReadout = document.getElementById( 'attn-head-readout' );
-
-let attnIndex = 0;
-let attnAutoplayTimer = null;
-let attnMode = 'naive';
-
-attnStepTotal.textContent = String( ATTENTION_STEPS.length );
-attnHeadSlider.max = String( HEAD_COUNT - 1 );
-attnKvCopy.textContent = KV_CACHE_NOTE.copy;
-
-function updateAttnUI() {
-
-	const step = ATTENTION_STEPS[ attnIndex ];
-	attnStepNum.textContent = String( attnIndex + 1 );
-	attnStepTitle.textContent = step.title.replace( /^\d+\.\s*/, '' );
-	attnStepDesc.textContent = step.copy;
-	attnStepEquations.textContent = step.equations.join( '\n' );
-	attnStepEquations.style.display = step.equations.length ? '' : 'none';
-	attnKvPanel.classList.toggle( 'is-hidden', attnIndex > 1 && attnIndex !== ATTENTION_STEPS.length - 1 );
-	paintTrack( attnTrack, attnIndex );
-
-}
-
-function goToAttnStep( index, { append = false } = {} ) {
-
-	const next = Math.max( 0, Math.min( ATTENTION_STEPS.length - 1, index ) );
-	const forwardOne = append && next === attnIndex + 1;
-	attnIndex = next;
-
-	worlds.attention.goToStep( attnIndex );
-	updateAttnUI();
-
-	if ( forwardOne ) {
-
-		proc.write( ATTENTION_STEPS[ attnIndex ].title, 'head' );
-		proc.writeAll( ATTENTION_STEPS[ attnIndex ].trace );
-
-	} else {
-
-		printAttnTraceTo( attnIndex );
-
-	}
-
-	proc.setStatus( `step ${ attnIndex + 1 }/${ ATTENTION_STEPS.length }`, attnIndex === ATTENTION_STEPS.length - 1 ? 'done' : 'running' );
-	flyCameraTo( worlds.attention.getStepView( attnIndex, camera ), 0.8 );
-
-}
-
-function printAttnTraceTo( index ) {
-
-	proc.clear();
-	proc.write( `head 1 of ${ HEAD_COUNT }  ·  d_k = ${ GPT2.dHead }  ·  ${ TOKENS.length } tokens`, 'dim' );
-	proc.rule();
-	for ( let i = 0; i <= index; i ++ ) {
-
-		proc.write( ATTENTION_STEPS[ i ].title, 'head' );
-		proc.writeAll( ATTENTION_STEPS[ i ].trace );
-
-	}
-
-}
-
-function updateKvReadout() {
-
-	const ops = KV_CACHE_NOTE.opsLabel( TOKENS.length );
-	attnKvOps.textContent = attnMode === 'cache'
-		? `KV cache: ${ ops.cache } K/V computations for ${ TOKENS.length } tokens.`
-		: `Naive recompute: ${ ops.naive } K/V computations for the same ${ TOKENS.length } tokens.`;
-
-}
-
-[ [ 'naive', 'Naive recompute' ], [ 'cache', 'KV cache' ] ].forEach( ( [ mode, label ], i ) => {
-
-	const chip = document.createElement( 'button' );
-	chip.type = 'button';
-	chip.className = 'chip' + ( i === 0 ? ' active' : '' );
-	chip.textContent = label;
-	chip.addEventListener( 'click', () => {
-
-		attnKvChipsEl.querySelectorAll( '.chip' ).forEach( ( c ) => c.classList.remove( 'active' ) );
-		chip.classList.add( 'active' );
-		attnMode = mode;
-		worlds.attention.setComputeMode( mode );
-		updateKvReadout();
-
-		const ops = KV_CACHE_NOTE.opsLabel( TOKENS.length );
-		proc.write( `compute mode: ${ label.toLowerCase() }`, 'cmd' );
-		proc.write( mode === 'cache'
-			? `K/V computed once per token → ${ ops.cache } computations`
-			: `K/V recomputed for every earlier token → ${ ops.naive } computations`, mode === 'cache' ? 'ok' : 'warn' );
-
-	} );
-	attnKvChipsEl.appendChild( chip );
-
-} );
-
-attnHeadSlider.addEventListener( 'input', () => {
-
-	const head = Number( attnHeadSlider.value );
-	attnHeadReadout.textContent = `${ head + 1 } / ${ HEAD_COUNT }`;
-	worlds.attention.setHead( head );
-
-	// Print the head's own attention row for the last token, so switching heads
-	// shows a number changing and not just a colour.
-	const row = HEAD_MATRICES[ head ].slice( ( TOKENS.length - 1 ) * TOKENS.length, TOKENS.length * TOKENS.length );
-	proc.write( `head ${ head + 1 }: A[${ TOKENS.length - 1 }, :] = [ ${ row.map( ( v ) => v.toFixed( 2 ) ).join( ', ' ) } ]`, 'calc' );
-
-} );
-
-function stopAttnAutoplay() {
-
-	if ( attnAutoplayTimer ) { clearInterval( attnAutoplayTimer ); attnAutoplayTimer = null; attnPlay.innerHTML = PLAY_ICON; }
-
-}
-
-document.getElementById( 'attn-prev' ).addEventListener( 'click', () => { stopAttnAutoplay(); goToAttnStep( attnIndex - 1 ); } );
-document.getElementById( 'attn-next' ).addEventListener( 'click', () => { stopAttnAutoplay(); goToAttnStep( attnIndex + 1, { append: true } ); } );
-attnPlay.addEventListener( 'click', () => {
-
-	if ( attnAutoplayTimer ) { stopAttnAutoplay(); return; }
-	if ( attnIndex >= ATTENTION_STEPS.length - 1 ) goToAttnStep( 0 );
-
-	attnPlay.innerHTML = PAUSE_ICON;
-	attnAutoplayTimer = setInterval( () => {
-
-		if ( attnIndex >= ATTENTION_STEPS.length - 1 ) { stopAttnAutoplay(); return; }
-		goToAttnStep( attnIndex + 1, { append: true } );
-
-	}, 3000 );
-
-} );
-
-buildTrack( attnTrack, ATTENTION_STEPS, ( i ) => { stopAttnAutoplay(); goToAttnStep( i ); } );
-updateAttnUI();
-updateKvReadout();
-
-function enterAttention() {
-
-	proc.setTitle( 'forward pass — self-attention' );
-	attnIndex = 0;
-	worlds.attention.goToStep( 0 );
-	worlds.attention.setHead( 0 );
-	worlds.attention.setComputeMode( 'naive' );
-	attnMode = 'naive';
-	attnHeadSlider.value = '0';
-	attnHeadReadout.textContent = `1 / ${ HEAD_COUNT }`;
-	attnKvChipsEl.querySelectorAll( '.chip' ).forEach( ( c, i ) => c.classList.toggle( 'active', i === 0 ) );
-	updateKvReadout();
-	updateAttnUI();
-	printAttnTraceTo( 0 );
-	proc.setStatus( `step 1/${ ATTENTION_STEPS.length }`, 'running' );
-	flyCameraTo( worlds.attention.getStepView( 0, camera ), 1.0 );
-
-}
-
-// ---------------------------------------------------------------- 04 output
-
-const OUT_STATIONS = [
-	{
-		title: 'Output embeddings',
-		description: `After all ${ GPT2.nLayer } blocks and the final LayerNorm, every position holds one ${ GPT2.dModel }-dimensional vector. Only the last one is used to predict the next token — the earlier ones have already done their job.`,
-	},
-	{
-		title: 'Linear layer (lm_head)',
-		description: `One matrix multiply takes that ${ GPT2.dModel }-dimensional vector to ${ VOCAB_SIZE.toLocaleString( 'en-AU' ) } numbers. GPT-2 ties this weight to the input embedding matrix, so scoring a token is a dot product against that token's own embedding row.`,
-	},
-	{
-		title: 'Logits',
-		description: 'The raw output: one unbounded score per vocabulary entry. A logit means nothing on its own — only its size relative to the other 50,256 matters.',
-	},
-	{
-		title: 'Temperature, then softmax',
-		description: 'Every logit is divided by T, then softmax exponentiates and normalises them into probabilities that sum to 1. Low T sharpens, high T flattens; the ranking is untouched either way.',
-	},
-	{
-		title: 'Top-p nucleus',
-		description: 'Sort by probability, keep the shortest prefix whose total reaches p, discard the rest and renormalise. The nucleus shrinks when the model is confident and grows when it is not.',
-	},
-];
-
-const outTrack = document.getElementById( 'out-track' );
-const outStepNum = document.getElementById( 'out-step-num' );
-const outStepTotal = document.getElementById( 'out-step-total' );
-const outStepTitle = document.getElementById( 'out-step-title' );
-const outStepDesc = document.getElementById( 'out-step-desc' );
-const outPlay = document.getElementById( 'out-play' );
-const outTableEl = document.getElementById( 'out-table' );
-const outSummaryEl = document.getElementById( 'out-summary' );
-const tempSlider = document.getElementById( 'temp-slider' );
-const tempReadout = document.getElementById( 'temp-readout' );
-const toppSlider = document.getElementById( 'topp-slider' );
-const toppReadout = document.getElementById( 'topp-readout' );
-
-let outIndex = 0;
-let outAutoplayTimer = null;
-let outParams = { ...DEFAULTS };
-
-outStepTotal.textContent = String( OUT_STATIONS.length );
-
-function renderOutTable( result ) {
-
-	const rows = result.rows.map( ( r ) => `
-		<tr class="${ r.kept ? '' : 'is-dropped' }${ r.index === result.argmaxIndex ? ' is-argmax' : '' }${ r.isTarget ? ' is-target' : '' }">
-			<td class="tok">${ r.display }</td>
-			<td class="num">${ r.logit.toFixed( 2 ) }</td>
-			<td class="num">${ ( r.prob * 100 ).toFixed( 1 ) }%</td>
-			<td class="num">${ r.kept ? `${ ( r.sampleProb * 100 ).toFixed( 1 ) }%` : '—' }</td>
-		</tr>` ).join( '' );
-
-	outTableEl.innerHTML = `
-		<thead><tr><th>Token</th><th class="num">Logit</th><th class="num">p</th><th class="num">After top-p</th></tr></thead>
-		<tbody>${ rows }</tbody>`;
-
-	outSummaryEl.textContent =
-		`nucleus: ${ result.keptCount } of ${ CANDIDATES.length } shown · mass ${ result.keptMass.toFixed( 3 ) } · entropy ${ result.entropy.toFixed( 3 ) } nats`;
-
-}
-
-function logDecode( result, reason ) {
-
-	proc.write( reason, 'cmd' );
-	proc.write( `z / T   T = ${ result.temperature.toFixed( 2 ) }`, 'calc' );
-	result.rows.forEach( ( r ) => {
-
-		proc.write( `${ r.display.padEnd( 9 ) } z ${ r.logit.toFixed( 2 ).padStart( 6 ) }  z/T ${ r.scaledLogit.toFixed( 2 ).padStart( 6 ) }  p ${ ( r.prob * 100 ).toFixed( 2 ).padStart( 6 ) }%`, r.kept ? 'out' : 'dim' );
-
-	} );
-	proc.write( `top-p  p = ${ result.topP.toFixed( 2 ) }  →  ${ result.keptCount } kept, cumulative ${ result.keptMass.toFixed( 3 ) }`, 'warn' );
-	proc.write( `argmax "${ result.rows[ result.argmaxIndex ].token }"  ·  entropy ${ result.entropy.toFixed( 3 ) } nats`, 'ok' );
-
-}
-
-function applyDecode( reason ) {
-
-	const result = worlds.output.setParams( outParams );
-	worlds.train.setResult( result );
-	renderOutTable( result );
-	if ( reason ) logDecode( result, reason );
-	return result;
-
-}
-
-function updateOutUI() {
-
-	const station = OUT_STATIONS[ outIndex ];
-	outStepNum.textContent = String( outIndex + 1 );
-	outStepTitle.textContent = station.title;
-	outStepDesc.textContent = station.description;
-	paintTrack( outTrack, outIndex );
-
-}
-
-function goToOutStation( index ) {
-
-	outIndex = Math.max( 0, Math.min( OUT_STATIONS.length - 1, index ) );
-	updateOutUI();
-	flyCameraTo( worlds.output.getStepView( outIndex ), 0.9 );
-	proc.setStatus( `station ${ outIndex + 1 }/${ OUT_STATIONS.length }`, outIndex === OUT_STATIONS.length - 1 ? 'done' : 'running' );
-
-}
-
-function stopOutAutoplay() {
-
-	if ( outAutoplayTimer ) { clearInterval( outAutoplayTimer ); outAutoplayTimer = null; outPlay.innerHTML = PLAY_ICON; }
-
-}
-
-document.getElementById( 'out-prev' ).addEventListener( 'click', () => { stopOutAutoplay(); goToOutStation( outIndex - 1 ); } );
-document.getElementById( 'out-next' ).addEventListener( 'click', () => { stopOutAutoplay(); goToOutStation( outIndex + 1 ); } );
-outPlay.addEventListener( 'click', () => {
-
-	if ( outAutoplayTimer ) { stopOutAutoplay(); return; }
-	if ( outIndex >= OUT_STATIONS.length - 1 ) goToOutStation( 0 );
-
-	outPlay.innerHTML = PAUSE_ICON;
-	outAutoplayTimer = setInterval( () => {
-
-		if ( outIndex >= OUT_STATIONS.length - 1 ) { stopOutAutoplay(); return; }
-		goToOutStation( outIndex + 1 );
-
-	}, 3200 );
-
-} );
-
-buildTrack( outTrack, OUT_STATIONS, ( i ) => { stopOutAutoplay(); goToOutStation( i ); } );
-
-// Sliders redraw the scene on every input event but only write to the console
-// when the drag settles, so a sweep does not bury the log in noise.
-let sliderLogTimer = null;
-
-function scheduleSliderLog( reason ) {
-
-	if ( sliderLogTimer ) clearTimeout( sliderLogTimer );
-	sliderLogTimer = setTimeout( () => { logDecode( worlds.output.getResult(), reason ); }, 320 );
-
-}
-
-tempSlider.addEventListener( 'input', () => {
-
-	outParams.temperature = Number( tempSlider.value );
-	tempReadout.textContent = outParams.temperature.toFixed( 2 );
-	applyDecode( null );
-	scheduleSliderLog( `set temperature ${ outParams.temperature.toFixed( 2 ) }` );
-
-} );
-
-toppSlider.addEventListener( 'input', () => {
-
-	outParams.topP = Number( toppSlider.value );
-	toppReadout.textContent = outParams.topP.toFixed( 2 );
-	applyDecode( null );
-	scheduleSliderLog( `set top_p ${ outParams.topP.toFixed( 2 ) }` );
-
-} );
-
-updateOutUI();
-
-function enterOutput() {
-
-	proc.clear();
-	proc.setTitle( 'forward pass — output head' );
-	proc.write( `h_final = ln_f(x)[-1]`, 'cmd' );
-	proc.write( formatVector( FINAL_HIDDEN_STATE, { decimals: 4, max: 6, dims: GPT2.dModel } ), 'out' );
-	proc.write( `logits = h_final @ wteᵀ    [${ GPT2.dModel }] × [${ GPT2.dModel }, ${ VOCAB_SIZE.toLocaleString( 'en-AU' ) }]`, 'calc' );
-	proc.write( `out    [${ VOCAB_SIZE.toLocaleString( 'en-AU' ) }] logits — top ${ CANDIDATES.length } shown below`, 'dim' );
-	proc.rule();
-
-	outIndex = 0;
-	updateOutUI();
-	applyDecode( `softmax(z / T), top_p = ${ outParams.topP.toFixed( 2 ) }` );
-	proc.rule();
-	proc.write( 'Probabilities are renormalised over the five candidates shown; the real softmax runs over all 50,257.', 'note' );
-	proc.setStatus( `station 1/${ OUT_STATIONS.length }`, 'running' );
-	flyCameraTo( worlds.output.getStepView( 0 ), 1.1 );
-
-}
-
-// ---------------------------------------------------------------- 05 train
-
-document.getElementById( 'score-table' ).innerHTML = `
-	<thead><tr><th>Score</th><th>Range</th><th>Meaning</th></tr></thead>
-	<tbody>${ SCORE_TABLE.map( ( r ) => `<tr><td>${ r.type }</td><td>${ r.range }</td><td>${ r.meaning }</td></tr>` ).join( '' ) }</tbody>`;
-
-document.getElementById( 'train-replay' ).addEventListener( 'click', () => enterTrain() );
-
-function enterTrain() {
-
-	const result = worlds.output.getResult();
-	worlds.train.setResult( result );
-
-	proc.clear();
-	proc.setTitle( 'backward pass — loss' );
-	proc.setStatus( 'computed', 'done' );
-
-	const target = result.rows.find( ( r ) => r.isTarget );
-	proc.write( 'loss = F.cross_entropy(logits, targets)', 'cmd' );
-	proc.write( `target      "${ target.token }"  (id ${ target.id })`, 'out' );
-	proc.write( `P(target)   ${ target.prob.toFixed( 6 ) }`, 'calc' );
-	proc.write( `log P       ${ Math.log( target.prob ).toFixed( 6 ) }`, 'calc' );
-	proc.write( `NLL         ${ result.nll.toFixed( 6 ) } nats`, 'ok' );
-	proc.rule();
-	proc.write( 'Inference and training read the same distribution from opposite ends: one samples from it, the other scores the single token that was right.', 'note' );
-	proc.write( `This trace used T = ${ result.temperature.toFixed( 2 ) } from page 04. Real training always uses T = 1 — temperature is an inference-time knob and has no place in the loss.`, 'warn' );
-
-	flyCameraTo( worlds.train.defaultView, 1.0 );
-
-}
-
-// ---------------------------------------------------------------- 06 glossary
-
-function enterGlossary() {
-
-	proc.clear();
-	proc.setTitle( 'reference' );
-	proc.setStatus( 'idle', 'idle' );
-	proc.write( `${ GPT2.name }`, 'head' );
-	[
-		[ 'layers', GPT2.nLayer ],
-		[ 'heads', GPT2.nHead ],
-		[ 'd_model', GPT2.dModel ],
-		[ 'd_head', GPT2.dHead ],
-		[ 'd_ff', GPT2.dFF ],
-		[ 'vocab', VOCAB_SIZE.toLocaleString( 'en-AU' ) ],
-		[ 'context', GPT2.contextLength ],
-		[ 'parameters', GPT2.parameters ],
-		[ 'norm', `${ GPT2.normPlacement } — LayerNorm before each sub-block` ],
-		[ 'lm_head', GPT2.tiedEmbeddings ? 'weight tied to wte' : 'separate weight' ],
-	].forEach( ( [ k, v ] ) => proc.write( `${ String( k ).padEnd( 12 ) } ${ v }`, 'out' ) );
-	proc.rule();
-	proc.write( 'Click any node in the viewport for a definition.', 'dim' );
-
-	flyCameraTo( worlds.glossary.defaultView, 1.0 );
-
-}
-
-// ---------------------------------------------------------------- start
-
-setActiveNav( 'tokenize' );
-Object.keys( worlds ).forEach( ( key ) => setWorldLabelsVisible( key, key === 'tokenize' ) );
-enterTokenize();
-
-const loadingEl = document.getElementById( 'loading' );
-setTimeout( () => loadingEl.classList.add( 'hidden' ), 700 );
-
-// ---------------------------------------------------------------- render loop
+/* ----------------------------------------------------------------- start */
+
+syncModeChips();
+worlds.linear.setStep( 0 );
+worlds.softmax.setResult( smResult );
+worlds.softmax.setStep( 0 );
+setCard( 'linear', 0 );
+setCard( 'softmax', 0 );
+
+navLinks.forEach( ( b ) => b.classList.toggle( 'active', b.dataset.goto === 'mlp' ) );
+worldPanels.forEach( ( p ) => p.classList.toggle( 'is-active', p.dataset.worldPanel === 'mlp' ) );
+Object.keys( worlds ).forEach( ( key ) => setWorldLabelsVisible( key, key === 'mlp' ) );
+enterMlp();
+
+setTimeout( () => document.getElementById( 'loading' ).classList.add( 'hidden' ), 700 );
 
 const clock = new THREE.Clock();
 
 renderer.setAnimationLoop( () => {
 
 	const dt = Math.min( 0.05, clock.getDelta() );
-
 	updateTweens( dt );
 	worlds[ currentKey ].update( dt );
 	controls.update();
-
 	renderPipeline.render();
 	labelRenderer.render( worlds[ currentKey ].scene, camera );
 
