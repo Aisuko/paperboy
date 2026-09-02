@@ -1,27 +1,27 @@
-/* Orchestra field guide — everything shared lives in ../../css/base.css.
-   This file only holds what is specific to this exhibit. */
-
-/* Only the active page's console controls are shown. */
 .foot-block { display: none; flex-direction: column; gap: 10px; }
-body[data-world="input"] .foot-block[data-foot="input"],
-body[data-world="aggregation"] .foot-block[data-foot="aggregation"],
-body[data-world="output"] .foot-block[data-foot="output"],
-body[data-world="compare"] .foot-block[data-foot="compare"] { display: flex; }
+body[data-world="floor"] .foot-block[data-foot="floor"],
+body[data-world="channel"] .foot-block[data-foot="channel"],
+body[data-world="schedule"] .foot-block[data-foot="schedule"],
+body[data-world="consensus"] .foot-block[data-foot="consensus"],
+body[data-world="guards"] .foot-block[data-foot="guards"] { display: flex; }
 
-body[data-world="overview"] .console-foot,
-body[data-world="council"] .console-foot { display: none; }
+.metric-note {
+	margin: 10px 0 0;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	line-height: 1.55;
+	color: var(--accent);
+}
 
-/* Agent roster and unified-estimate tables. */
-#council-table td.name,
-#output-table td.name { color: var(--ink); }
-#council-table tr.is-soh td.name { color: var(--info); }
-#council-table tr.is-rul td.name { color: var(--violet, #a78bfa); }
-#council-table tfoot td { color: var(--accent); border-bottom: none; padding-top: 8px; }
+.data-table td.tok { color: var(--ink); }
+.data-table td.name { color: var(--ink); }
+.data-table tr.is-top td.tok,
+.data-table tr.is-top td.name { color: var(--accent); }
+.data-table tr.is-dropped td { color: var(--ink-faint); }
+.data-table tr.is-trap td.tok { color: var(--signal); }
+.data-table tr.is-tail td { color: var(--ink-faint); font-style: italic; }
+.data-table tr.is-off td.name { color: var(--rose, #ef8f6e); }
 
-#output-table td.value { color: var(--accent); }
-#output-table tr.is-risk td.value { color: var(--ok); }
+.step-card pre { color: var(--signal); }
 
-#compare-note { color: var(--ink-dim); }
-#compare-note.is-live { color: var(--signal); }
-
-:root { --violet: #a78bfa; }
+:root { --violet: #a78bfa; --rose: #ef8f6e; }
