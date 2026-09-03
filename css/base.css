@@ -1,31 +1,17 @@
-/* ============================================================================
-   paperboy — shared "instrument console" theme + split-layout shell.
-
-   Loaded by every field guide before its own css/main.css. Owns:
-     · the colour/type tokens all four pages share
-     · the two-pane shell  (left process console | right 3D viewport)
-     · nav, console, HUD, scrubber, chip, detail-card primitives
-
-   Site stylesheets only add what is genuinely site-specific.
-   ========================================================================= */
-
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
 
 :root {
-	/* surfaces */
 	--bg: #07090b;
 	--bg-2: #0a0d10;
 	--panel: #0d1114;
 	--panel-2: #11171b;
 	--panel-raised: #151c21;
 
-	/* ink */
 	--ink: #dfe6ea;
 	--ink-dim: #9aa8b0;
 	--ink-dimmer: #6b7880;
 	--ink-faint: #46525a;
 
-	/* signal colours — one cool accent, one warm signal, plus states */
 	--accent: #4ec9b0;
 	--accent-soft: rgba(78, 201, 176, 0.14);
 	--signal: #e8a33d;
@@ -34,11 +20,9 @@
 	--danger: #e5644e;
 	--ok: #6fcf7f;
 
-	/* rules */
 	--line: rgba(255, 255, 255, 0.07);
 	--line-strong: rgba(255, 255, 255, 0.13);
 
-	/* metrics */
 	--nav-h: 52px;
 	--console-w: 400px;
 	--radius: 4px;
@@ -64,13 +48,10 @@ html, body {
 
 ::selection { background: var(--accent-soft); color: var(--ink); }
 
-/* thin, unobtrusive scrollbars everywhere in the shell */
 * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.14) transparent; }
 *::-webkit-scrollbar { width: 8px; height: 8px; }
 *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
 *::-webkit-scrollbar-track { background: transparent; }
-
-/* ============================ shell ==================================== */
 
 #app {
 	position: fixed;
@@ -98,8 +79,6 @@ html, body {
 #webgl { position: absolute; inset: 0; }
 #webgl canvas { display: block; width: 100%; height: 100%; }
 
-/* faint measurement grid over the viewport, so the 3D pane reads as an
-   instrument readout rather than an empty void */
 #viewport::before {
 	content: '';
 	position: absolute;
@@ -121,8 +100,6 @@ html, body {
 	pointer-events: none;
 	background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.5) 100%);
 }
-
-/* ============================ nav ====================================== */
 
 #nav {
 	flex: none;
@@ -192,15 +169,10 @@ html, body {
 }
 .nav-source:hover { color: var(--ink); background: rgba(255,255,255,0.04); }
 
-/* ======================== process console (left) ======================= */
-
 #console {
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
-	/* A grid item defaults to min-height:auto, so without this the log body
-	   sizes the whole column and pushes .console-foot off the bottom of the
-	   screen once a page prints more than a screenful of trace. */
 	min-height: 0;
 	overflow: hidden;
 	background: var(--panel);
@@ -314,7 +286,6 @@ html, body {
 }
 .console-foot:empty { display: none; }
 
-/* interactive prompt line (Hurd "run a command") */
 .console-prompt { display: flex; align-items: center; gap: 8px; }
 .console-prompt .ps1 { color: var(--accent); font-size: 12px; white-space: nowrap; }
 .console-input {
@@ -323,8 +294,6 @@ html, body {
 	color: var(--ink); font-family: var(--font-mono); font-size: 12px;
 }
 .console-input::placeholder { color: var(--ink-faint); }
-
-/* ============================ HUD ====================================== */
 
 .world {
 	position: absolute;
@@ -337,8 +306,6 @@ html, body {
 }
 .world.is-active { opacity: 1; visibility: visible; }
 
-/* Soft scrim down the left edge so headline copy stays readable over whatever
-   the 3D scene happens to be doing behind it. */
 .world::before {
 	content: '';
 	position: absolute;
@@ -422,7 +389,6 @@ html, body {
 	overflow-wrap: anywhere;
 }
 
-/* legend */
 .legend { display: flex; flex-direction: column; gap: 5px; }
 .legend-item {
 	display: flex; align-items: center; gap: 8px;
@@ -430,7 +396,6 @@ html, body {
 }
 .legend-dot { width: 7px; height: 7px; border-radius: 1px; flex: none; }
 
-/* chips */
 .chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip {
 	font-family: var(--font-mono);
@@ -452,7 +417,6 @@ html, body {
 .chip.active { color: var(--accent); border-color: rgba(78,201,176,0.42); background: var(--accent-soft); }
 .chip:disabled { opacity: 0.35; cursor: not-allowed; }
 
-/* buttons */
 .btn-action {
 	font-family: var(--font-mono);
 	font-size: 11px;
@@ -471,7 +435,6 @@ html, body {
 .btn-action.is-danger { color: var(--danger); border-color: rgba(229,100,78,0.34); background: rgba(229,100,78,0.12); }
 .btn-action.is-danger:hover:not(:disabled) { background: rgba(229,100,78,0.2); }
 
-/* step scrubber */
 .scrubber {
 	display: flex;
 	align-items: center;
@@ -506,7 +469,6 @@ html, body {
 .scrubber-node.done { background: rgba(78,201,176,0.4); }
 .scrubber-node.active { background: var(--accent); box-shadow: 0 0 8px rgba(78,201,176,0.7); }
 
-/* sliders (cortex temperature / top-p) */
 .control-row { display: flex; flex-direction: column; gap: 5px; }
 .control-label {
 	display: flex; justify-content: space-between; align-items: baseline;
@@ -529,7 +491,6 @@ input[type="range"]::-moz-range-thumb {
 	background: var(--accent); cursor: pointer; border: none;
 }
 
-/* data table */
 .data-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 11px; }
 .data-table th, .data-table td {
 	text-align: left; padding: 5px 8px;
@@ -540,9 +501,7 @@ input[type="range"]::-moz-range-thumb {
 	letter-spacing: 0.1em; font-size: 9.5px; font-weight: 500;
 }
 .data-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
-.data-table tr.is-target td { color: var(--accent); }
 
-/* 3D world labels */
 .label2d {
 	pointer-events: none;
 	font-family: var(--font-mono);
@@ -558,8 +517,6 @@ input[type="range"]::-moz-range-thumb {
 }
 .label2d-dim { font-size: 9.5px; color: var(--ink-dimmer); background: rgba(7,9,11,0.6); padding: 1px 5px; }
 .label2d-key { color: var(--accent); border-color: rgba(78,201,176,0.3); }
-
-/* ========================== detail card ================================ */
 
 .detail-card {
 	position: absolute;
@@ -611,8 +568,6 @@ input[type="range"]::-moz-range-thumb {
 }
 .detail-rpc-fields ul { padding-left: 14px; font-size: 11px; line-height: 1.55; }
 
-/* ============================ loading ================================== */
-
 #loading {
 	position: fixed; inset: 0; z-index: 100;
 	display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -633,16 +588,12 @@ input[type="range"]::-moz-range-thumb {
 @keyframes loadsweep { 0% { transform: translateX(-110%); } 100% { transform: translateX(400%); } }
 .loading-label { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); }
 
-/* ============================ footer =================================== */
-
 #foot-credit {
 	position: absolute; bottom: 8px; right: 14px; z-index: 15;
 	font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-faint);
 }
 #foot-credit a { color: var(--ink-faint); }
 #foot-credit a:hover { color: var(--ink-dim); }
-
-/* ========================== responsive ================================= */
 
 @media (min-width: 1100px) { .nav-brand-sub { display: inline; } }
 

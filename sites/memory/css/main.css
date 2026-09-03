@@ -1,0 +1,19 @@
+.foot-block { display: none; flex-direction: column; gap: 10px; }
+body[data-world="tensor"] .foot-block[data-foot="tensor"],
+body[data-world="formats"] .foot-block[data-foot="formats"],
+body[data-world="transfer"] .foot-block[data-foot="transfer"],
+body[data-world="intensity"] .foot-block[data-foot="intensity"] { display: flex; }
+
+.metric-note {
+	margin: 10px 0 0;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	line-height: 1.55;
+	color: var(--accent);
+}
+
+.data-table td.tag { color: var(--ink); }
+.data-table tr.is-pick td.tag { color: var(--accent); }
+.data-table tr.is-warn td.num { color: var(--signal); }
+
+.step-card pre { color: var(--signal); }

@@ -1,9 +1,5 @@
 import * as THREE from 'three';
 
-// Ambient background for the landing page hero: a slowly rotating
-// constellation of nodes/edges, echoing the servers-talking-over-IPC
-// idea behind the GNU/Hurd tour without trying to explain anything itself.
-
 const container = document.getElementById( 'hero-webgl' );
 const reduceMotion = window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
 

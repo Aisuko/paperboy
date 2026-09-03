@@ -2,7 +2,6 @@
 
 :root {
 	color-scheme: dark;
-	/* Same instrument-console palette as the three field guides. */
 	--bg: #07090b;
 	--bg-2: #0d1114;
 	--ink: #dfe6ea;
@@ -31,7 +30,6 @@ html, body {
 
 a { color: inherit; }
 
-/* faint measurement grid, matching the viewport overlay in the field guides */
 body::before {
 	content: '';
 	position: fixed;
@@ -48,7 +46,6 @@ body::before {
 #hero-webgl { position: fixed; inset: 0; z-index: 0; }
 #hero-webgl canvas { display: block; }
 
-/* ---------------- sidebar ---------------- */
 #sidebar {
 	position: fixed;
 	top: 0; left: 0; bottom: 0;
@@ -104,7 +101,6 @@ body::before {
 
 .side-foot { font-size: 11px; color: var(--ink-dimmer); padding-top: 18px; margin-top: 18px; border-top: 1px solid var(--line); }
 
-/* ---------------- main ---------------- */
 #main {
 	position: relative;
 	z-index: 10;
@@ -123,7 +119,6 @@ body::before {
 .topbar-links a { display: flex; color: var(--ink-dimmer); transition: color 0.15s ease; }
 .topbar-links a:hover { color: var(--ink); }
 
-/* ---------------- hero ---------------- */
 .hero {
 	min-height: 86vh;
 	display: flex;
@@ -180,7 +175,6 @@ body::before {
 	letter-spacing: 0.04em;
 }
 
-/* ---------------- section shell ---------------- */
 .projects, .about {
 	position: relative;
 	background: var(--bg);
@@ -192,35 +186,27 @@ body::before {
 .section-head h2 { font-size: 1.8rem; margin: 0; letter-spacing: -0.01em; }
 .section-head p { margin: 0; color: var(--ink-dim); font-size: 0.95rem; flex-basis: 100%; }
 
-/* ---------------- gallery grid ---------------- */
 .gallery-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-		gap: 22px;
-		max-width: 1180px;
-	}
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+	gap: 22px;
+	max-width: 1180px;
+}
 .gallery-tile {
-		display: flex;
-		flex-direction: column;
-		background: var(--bg-2);
-		border: 1px solid var(--line);
-		border-radius: 18px;
-		overflow: hidden;
-		text-decoration: none;
-		color: inherit;
-		will-change: transform;
-		transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease-out;
-	}
-.gallery-tile[data-tilt] {
-		transform-style: preserve-3d;
-		transition: transform 0.15s ease-out;
-	}
-.gallery-tile[data-tilt] .gallery-visual {
-		backface-visibility: hidden;
-	}
-.gallery-tile[data-tilt] .gallery-body {
-		backface-visibility: hidden;
-	}
+	display: flex;
+	flex-direction: column;
+	background: var(--bg-2);
+	border: 1px solid var(--line);
+	border-radius: 18px;
+	overflow: hidden;
+	text-decoration: none;
+	color: inherit;
+	will-change: transform;
+	transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease-out;
+}
+.gallery-tile[data-tilt] { transform-style: preserve-3d; transition: transform 0.15s ease-out; }
+.gallery-tile[data-tilt] .gallery-visual,
+.gallery-tile[data-tilt] .gallery-body { backface-visibility: hidden; }
 .gallery-tile--featured { grid-column: span 2; flex-direction: row; }
 .gallery-tile--featured .gallery-visual { flex: 0 0 42%; min-height: 220px; }
 .gallery-tile--featured .gallery-body { flex: 1; }
@@ -276,8 +262,7 @@ a.gallery-tile:hover {
 	border-radius: 999px;
 }
 
-/* ---------------- gallery: coming-soon tiles ---------------- */
-.gallery-tile--soon { cursor: default; }
+.gallery-tile--soon { cursor: default; border-style: dashed; }
 .gallery-tile--soon .gallery-visual {
 	background: none;
 	border-bottom: 1px dashed var(--line);
@@ -295,14 +280,11 @@ a.gallery-tile:hover {
 	align-items: center;
 	justify-content: center;
 }
-.gallery-tile--soon { border-style: dashed; }
 .gallery-tile--soon .gallery-body h3 { color: var(--ink-dim); font-size: 1.15rem; }
 
-/* ---------------- about ---------------- */
 .about p { max-width: 680px; color: var(--ink-dim); font-size: 1rem; line-height: 1.7; margin: 0 0 20px; }
 .about a { color: var(--accent-3); }
 
-/* ---------------- footer ---------------- */
 #foot {
 	display: flex;
 	align-items: center;
@@ -314,10 +296,7 @@ a.gallery-tile:hover {
 	font-size: 12px;
 	color: var(--ink-dimmer);
 }
-#foot a { color: var(--ink-dim); text-decoration: none; }
-#foot a:hover { color: var(--accent-3); }
 
-/* ---------------- floating action button ---------------- */
 .fab {
 	position: fixed;
 	right: 24px;
@@ -338,7 +317,6 @@ a.gallery-tile:hover {
 }
 .fab:hover { transform: translateY(-2px); }
 
-/* ---------------- responsive ---------------- */
 @media (max-width: 900px) {
 	:root { --sidebar-w: 0px; }
 	#sidebar {

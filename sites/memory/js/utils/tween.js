@@ -1,5 +1,3 @@
-// Minimal dependency-free tween/easing helper (no GSAP vendored).
-
 export const Easing = {
 	linear: ( t ) => t,
 	quadInOut: ( t ) => ( t < 0.5 ? 2 * t * t : 1 - Math.pow( -2 * t + 2, 2 ) / 2 ),
@@ -67,7 +65,6 @@ export function updateTweens( dt ) {
 
 }
 
-// Convenience: tween a Vector3-like object (anything with .x/.y/.z) toward a target.
 export function tweenVec3( obj, target, duration, opts ) {
 
 	const start = { x: obj.x, y: obj.y, z: obj.z };

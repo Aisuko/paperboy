@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+	<meta charset="utf-8" />
+	<title>Memory accounting — tensors, float formats, and the bus</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<meta name="description" content="What a tensor costs in memory: rank, shape and strides, the bit layout of float32, float16, bfloat16, float8 and nvfp4, the trip from host RAM across PCIe into GPU HBM, and the arithmetic intensity that decides whether a kernel is memory-bound or compute-bound. Every number computed live." />
+	<link rel="icon" href="../../favicon.svg" type="image/svg+xml" />
+	<link rel="stylesheet" href="../../css/base.css" />
+	<link rel="stylesheet" href="css/main.css" />
+</head>
+<body data-world="tensor">
+
+	<div id="loading">
+		<div class="loading-mark">MEMORY</div>
+		<div class="loading-bar"><span></span></div>
+		<div class="loading-label">counting bytes&hellip;</div>
+	</div>
+
+	<div id="app">
+
+		<header id="nav">
+			<div class="nav-brand">
+				<span class="nav-brand-a">tensor</span><span class="nav-brand-slash">/</span><span class="nav-brand-b">MEMORY</span>
+				<span class="nav-brand-sub">accounting</span>
+			</div>
+			<nav class="nav-links">
+				<button class="nav-link" data-goto="tensor"><span class="nav-index">01</span>Tensor &middot; shape &middot; stride</button>
+				<button class="nav-link" data-goto="formats"><span class="nav-index">02</span>Float formats</button>
+				<button class="nav-link" data-goto="transfer"><span class="nav-index">03</span>Host &rarr; GPU</button>
+				<button class="nav-link" data-goto="intensity"><span class="nav-index">04</span>Arithmetic intensity</button>
+			</nav>
+			<a class="nav-source" href="../../">&larr; Home</a>
+		</header>
+
+		<main id="stage">
+
+			<aside id="console">
+				<div class="console-head">
+					<div class="console-title">memory ledger</div>
+					<div class="console-status" data-state="idle"><span class="dot"></span><span class="text">idle</span></div>
+				</div>
+				<div class="console-body"></div>
+				<div class="console-foot">
+
+					<div class="foot-block" data-foot="tensor">
+						<div class="control-row">
+							<div class="control-label"><span>Element on the tape</span><b id="idx-readout">[3, 5]</b></div>
+							<input id="idx-slider" type="range" min="0" max="47" step="1" value="29" aria-label="Element index" />
+						</div>
+						<div class="scrubber" data-scrub="tensor">
+							<button class="scrubber-btn" data-act="prev" aria-label="Previous step"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 4 8l6 5"/></svg></button>
+							<button class="scrubber-btn scrubber-play" data-act="play" aria-label="Play steps"><svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg></button>
+							<div class="scrubber-track"></div>
+							<button class="scrubber-btn" data-act="next" aria-label="Next step"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 5-6 5"/></svg></button>
+						</div>
+					</div>
+
+					<div class="foot-block" data-foot="formats">
+						<div class="control-row">
+							<div class="control-label"><span>Value to encode</span><b id="val-readout">3.14159</b></div>
+							<input id="val-slider" type="range" min="0" max="1" step="0.0005" value="0.5276" aria-label="Value" />
+						</div>
+						<div class="chip-row" id="val-chips"></div>
+						<div class="control-label"><span>Tensor</span></div>
+						<div class="chip-row" id="shape-chips"></div>
+						<div class="scrubber" data-scrub="formats">
+							<button class="scrubber-btn" data-act="prev" aria-label="Previous step"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 4 8l6 5"/></svg></button>
+							<button class="scrubber-btn scrubber-play" data-act="play" aria-label="Play steps"><svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg></button>
+							<div class="scrubber-track"></div>
+							<button class="scrubber-btn" data-act="next" aria-label="Next step"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 5-6 5"/></svg></button>
+						</div>
+					</div>
+
+					<div class="foot-block" data-foot="transfer">
+						<div class="control-label"><span>dtype</span></div>
+						<div class="chip-row" id="dtype-chips"></div>
+						<div class="control-label"><span>link</span></div>
+						<div class="chip-row" id="link-chips"></div>
+						<div class="chip-row">
+							<button class="chip active" id="pin-chip">pinned</button>
+							<button class="chip" id="shape-chip"></button>
+						</div>
+						<button id="copy-btn" class="btn-action">Run the copy</button>
+						<div class="scrubber" data-scrub="transfer">
+							<button class="scrubber-btn" data-act="prev" aria-label="Previous step"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 4 8l6 5"/></svg></button>
+							<button class="scrubber-btn scrubber-play" data-act="play" aria-label="Play steps"><svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg></button>
+							<div class="scrubber-track"></div>
+							<button class="scrubber-btn" data-act="next" aria-label="Next step"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 5-6 5"/></svg></button>
+						</div>
+					</div>
+
+					<div class="foot-block" data-foot="intensity">
+						<div class="control-label"><span>operator</span></div>
+						<div class="chip-row" id="op-chips"></div>
+						<div class="control-row">
+							<div class="control-label"><span>batch B</span><b id="batch-readout">1</b></div>
+							<input id="batch-slider" type="range" min="0" max="1" step="0.001" value="0" aria-label="Batch size" />
+						</div>
+						<div class="control-label"><span>dtype</span></div>
+						<div class="chip-row" id="prec-chips"></div>
+						<div class="control-label"><span>accelerator</span></div>
+						<div class="chip-row" id="acc-chips"></div>
+						<div class="control-row">
+							<div class="control-label"><span>MFU</span><b id="mfu-readout">0.50</b></div>
+							<input id="mfu-slider" type="range" min="0.05" max="0.95" step="0.01" value="0.5" aria-label="Model FLOPs utilisation" />
+						</div>
+						<div class="control-label"><span>model</span></div>
+						<div class="chip-row" id="model-chips"></div>
+						<div class="scrubber" data-scrub="intensity">
+							<button class="scrubber-btn" data-act="prev" aria-label="Previous step"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 4 8l6 5"/></svg></button>
+							<button class="scrubber-btn scrubber-play" data-act="play" aria-label="Play steps"><svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg></button>
+							<div class="scrubber-track"></div>
+							<button class="scrubber-btn" data-act="next" aria-label="Next step"><svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 5-6 5"/></svg></button>
+						</div>
+					</div>
+
+				</div>
+			</aside>
+
+			<section id="viewport">
+				<div id="webgl"></div>
+
+				<div class="world" data-world-panel="tensor">
+					<div class="hud hud-top-left">
+						<div class="eyebrow">01 &middot; Rank &middot; shape &middot; stride</div>
+						<h1>Every tensor is a<br /><em>flat run of bytes.</em></h1>
+						<p class="lede">
+							Rank 0 to rank n, the storage never changes shape: one contiguous buffer plus
+							the strides that pretend it is a rectangle. Watch a 6&times;8 matrix unroll onto
+							its tape, then read the same bytes as its own transpose.
+						</p>
+						<div class="hint">Drag to orbit &middot; scroll to zoom &middot; click a cell</div>
+					</div>
+					<div class="hud hud-top-right panel step-card" data-card="tensor">
+						<div class="step-card-index"><span data-role="kicker"></span> &middot; step <span data-role="num">1</span> / <span data-role="total">6</span></div>
+						<h2 data-role="title"></h2>
+						<p data-role="desc"></p>
+						<pre data-role="formula"></pre>
+					</div>
+					<div class="hud hud-bottom-right panel step-card">
+						<div class="step-card-index">This tensor</div>
+						<table class="data-table" id="tensor-table"></table>
+					</div>
+				</div>
+
+				<div class="world" data-world-panel="formats">
+					<div class="hud hud-top-left">
+						<div class="eyebrow">02 &middot; float32 &rarr; nvfp4</div>
+						<h1>Same number,<br /><em>six budgets.</em></h1>
+						<p class="lede">
+							Sign, exponent, fraction. Exponent bits buy range, fraction bits buy precision,
+							and every format is a different way of spending a fixed number of bits.
+							Move the slider and watch the same value round six ways.
+						</p>
+						<div class="hint">Bright cubes are 1 bits &middot; click one</div>
+					</div>
+					<div class="hud hud-top-right panel step-card" data-card="formats">
+						<div class="step-card-index"><span data-role="kicker"></span> &middot; step <span data-role="num">1</span> / <span data-role="total">8</span></div>
+						<h2 data-role="title"></h2>
+						<p data-role="desc"></p>
+						<pre data-role="formula"></pre>
+					</div>
+					<div class="hud hud-bottom-right panel step-card">
+						<div class="step-card-index">Live encoding</div>
+						<table class="data-table" id="fmt-table"></table>
+						<p class="metric-note" id="fmt-summary"></p>
+					</div>
+				</div>
+
+				<div class="world" data-world-panel="transfer">
+					<div class="hud hud-top-left">
+						<div class="eyebrow">03 &middot; CPU &rarr; PCIe &rarr; HBM</div>
+						<h1>The bus is the<br /><em>slowest thing here.</em></h1>
+						<p class="lede">
+							A tensor built on the CPU has to be pinned, pushed down sixteen PCIe lanes and
+							parked in HBM before a single SM can touch it. The dtype you chose decides how
+							long that takes &mdash; and whether it fits at all.
+						</p>
+						<div class="hint">Packet speed is on a log scale &middot; click a part</div>
+					</div>
+					<div class="hud hud-top-right panel step-card" data-card="transfer">
+						<div class="step-card-index"><span data-role="kicker"></span> &middot; step <span data-role="num">1</span> / <span data-role="total">6</span></div>
+						<h2 data-role="title"></h2>
+						<p data-role="desc"></p>
+						<pre data-role="formula"></pre>
+					</div>
+					<div class="hud hud-bottom-right panel step-card">
+						<div class="step-card-index">This copy</div>
+						<table class="data-table" id="xfer-table"></table>
+						<p class="metric-note" id="xfer-summary"></p>
+					</div>
+				</div>
+
+				<div class="world" data-world-panel="intensity">
+					<div class="hud hud-top-left">
+						<div class="eyebrow">04 &middot; FLOPs &middot; roofline &middot; MFU</div>
+						<h1>Bytes are the bill,<br /><em>FLOPs are the clock.</em></h1>
+						<p class="lede">
+							Count a training run in FLOPs, divide by what one card can actually deliver in a
+							week, then ask the question that decides which of the two numbers you are paying:
+							how much arithmetic does this kernel do per byte it moves?
+						</p>
+						<div class="hint">Move the batch slider &middot; watch the puck cross the ridge</div>
+					</div>
+					<div class="hud hud-top-right panel step-card" data-card="intensity">
+						<div class="step-card-index"><span data-role="kicker"></span> &middot; step <span data-role="num">1</span> / <span data-role="total">7</span></div>
+						<h2 data-role="title"></h2>
+						<p data-role="desc"></p>
+						<pre data-role="formula"></pre>
+					</div>
+					<div class="hud hud-bottom-right panel step-card">
+						<div class="step-card-index" id="int-head">This kernel</div>
+						<table class="data-table" id="int-table"></table>
+						<p class="metric-note" id="int-summary"></p>
+					</div>
+				</div>
+
+				<aside id="detail-card" class="detail-card" aria-hidden="true">
+					<button id="detail-close" class="detail-close" aria-label="Close">&times;</button>
+					<div class="detail-category" id="detail-category"></div>
+					<h3 id="detail-name"></h3>
+					<p class="detail-blurb" id="detail-blurb"></p>
+					<p id="detail-description"></p>
+					<div class="detail-block" id="detail-metric-block">
+						<h4 id="detail-metric-label">Value</h4>
+						<p class="detail-metric" id="detail-metric"></p>
+					</div>
+				</aside>
+
+				<footer id="foot-credit">
+					Reference tensor: 49,152 &times; 12,288 &middot; <a href="../../">paperboy</a>
+				</footer>
+			</section>
+
+		</main>
+	</div>
+
+	<script type="importmap">
+		{
+			"imports": {
+				"three": "./vendor/three/build/three.webgpu.js",
+				"three/webgpu": "./vendor/three/build/three.webgpu.js",
+				"three/tsl": "./vendor/three/build/three.tsl.js",
+				"three/addons/": "./vendor/three/jsm/"
+			}
+		}
+	</script>
+	<script type="module" src="js/main.js"></script>
+
+</body>
+</html>
