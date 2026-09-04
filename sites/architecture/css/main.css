@@ -1,0 +1,20 @@
+.foot-block { display: none; flex-direction: column; gap: 10px; }
+body[data-world="residual"] .foot-block[data-foot="residual"],
+body[data-world="norm"] .foot-block[data-foot="norm"],
+body[data-world="activation"] .foot-block[data-foot="activation"],
+body[data-world="glu"] .foot-block[data-foot="glu"] { display: flex; }
+
+.metric-note {
+	margin: 10px 0 0;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	line-height: 1.55;
+	color: var(--accent);
+}
+
+.data-table td.tag { color: var(--ink); }
+.data-table tr.is-pick td.tag { color: var(--accent); }
+.data-table tr.is-pick td.num { color: var(--accent); }
+.data-table tr.is-warn td.num { color: var(--signal); }
+
+.step-card pre { color: var(--signal); }
