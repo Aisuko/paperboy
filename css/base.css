@@ -1,6 +1,26 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
 
+/* ---------------------------------------------------------------------------
+   Theme tokens.
+
+   Dark is the default set below. A `@media (prefers-color-scheme: light)`
+   block near the bottom of this file overrides every one of them for a light
+   OS setting. There are no exceptions: the chrome and the WebGL stage flip
+   together, so the page is never light-over-dark.
+
+   That includes the three.js scenes. The `--stage-*`, `--rig-*` and `--bloom-*`
+   tokens below are read back out by `js/theme.js` and handed to `sceneKit.js`,
+   which is why this file — not the JS — is the single source of truth for
+   every colour on the site.
+
+   Consequence: no colour literal below may be hardcoded. Anything that used
+   to be a raw `rgba(255,255,255,…)` or `rgba(13,17,20,…)` is a token now, or
+   it would not flip.
+   --------------------------------------------------------------------------- */
+
 :root {
+	color-scheme: dark;
+
 	--bg: #07090b;
 	--bg-2: #0a0d10;
 	--panel: #0d1114;
@@ -14,14 +34,96 @@
 
 	--accent: #4ec9b0;
 	--accent-soft: rgba(78, 201, 176, 0.14);
+	--accent-line: rgba(78, 201, 176, 0.32);
+	--accent-line-strong: rgba(78, 201, 176, 0.42);
+	--accent-glow: rgba(78, 201, 176, 0.45);
 	--signal: #e8a33d;
 	--signal-soft: rgba(232, 163, 61, 0.14);
+	--signal-line: rgba(232, 163, 61, 0.34);
+	--signal-hover: rgba(232, 163, 61, 0.22);
 	--info: #6ea8fe;
 	--danger: #e5644e;
+	--danger-soft: rgba(229, 100, 78, 0.12);
+	--danger-line: rgba(229, 100, 78, 0.34);
+	--danger-hover: rgba(229, 100, 78, 0.2);
 	--ok: #6fcf7f;
 
 	--line: rgba(255, 255, 255, 0.07);
 	--line-strong: rgba(255, 255, 255, 0.13);
+	--line-hover: rgba(255, 255, 255, 0.22);
+
+	/* Translucent washes over whatever sits behind them. */
+	--surface: rgba(255, 255, 255, 0.04);
+	--surface-2: rgba(255, 255, 255, 0.05);
+	--surface-3: rgba(255, 255, 255, 0.09);
+	--surface-4: rgba(255, 255, 255, 0.1);
+	--track: rgba(255, 255, 255, 0.11);
+	--code-bg: rgba(255, 255, 255, 0.06);
+	--scrollbar: rgba(255, 255, 255, 0.12);
+	--scrollbar-hover: rgba(255, 255, 255, 0.2);
+
+	/* Glass sitting on the WebGL canvas. Flips with the stage behind it. */
+	--glass: rgba(13, 17, 20, 0.86);
+	--glass-solid: rgba(13, 17, 20, 0.9);
+	--glass-strong: rgba(10, 13, 16, 0.96);
+	--label-bg: rgba(7, 9, 11, 0.78);
+	--label-bg-dim: rgba(7, 9, 11, 0.6);
+	--pre-bg: rgba(0, 0, 0, 0.35);
+
+	/* Stage decoration painted in CSS on top of the canvas. */
+	--stage-wash: rgba(78, 201, 176, 0.05);
+	--grid-line: rgba(255, 255, 255, 0.018);
+	--vignette: rgba(0, 0, 0, 0.5);
+	--world-fade: rgba(7, 9, 11, 0.9);
+	--world-fade-soft: rgba(7, 9, 11, 0.55);
+
+	/* ---- three.js palette -------------------------------------------------
+	   Read at load by `js/theme.js` and copied into `sceneKit.js`'s THEME.
+	   The scenes also use --accent / --signal / --info / --danger / --ok
+	   directly, so those only exist once. */
+	--stage-bg: #07090b;
+	--stage-deck: #0c1113;
+	--stage-grid: #1c262b;
+	--stage-grid-accent: #2c4a48;
+	--stage-shell: #1b2329;
+	--stage-shell-2: #1b1b26;
+	--stage-muted: #38424a;
+	--stage-off: #223034;
+	--stage-violet: #a78bfa;
+	--stage-rose: #ef8f6e;
+	--stage-cyan: #4dd0e1;
+	--stage-ink: #dfe6ea;
+	--stage-edge: #ffffff;
+
+	/* Light rig. Colours are absolute; the *-gain values multiply each
+	   scene's own authored intensity, so a theme only expresses the delta. */
+	--rig-sky: #8fa6ad;
+	--rig-ground: #05070a;
+	--rig-key: #f2f7f8;
+	--rig-fill: #7f939c;
+	--rig-hemi-gain: 1;
+	--rig-key-gain: 1;
+	--rig-fill-gain: 1;
+	--rig-rim-gain: 1;
+	--stage-grid-gain: 1;
+	/* Multiplies each scene's authored FogExp2 density. */
+	--stage-fog-gain: 1;
+	/* How far module shells lerp toward their category colour. Dark keeps
+	   neutral shells (colour arrives via emissive); light mode tints the
+	   diffuse instead, because additive emissive dies on a white stage. */
+	--stage-shell-mix: 0;
+
+	/* Additive emissive and bloom read as haze on a light background. */
+	--stage-emissive: 1;
+	--bloom-gain: 1;
+	--bloom-threshold: 0.6;
+
+	/* Image-based lighting (RoomEnvironment PMREM) strength, key-light
+	   shadow strength (0 disables shadows entirely) and the hover
+	   emissive boost on clickable meshes. */
+	--env-intensity: 0.35;
+	--stage-shadow-gain: 0.7;
+	--hover-boost: 1.9;
 
 	--nav-h: 52px;
 	--console-w: 400px;
@@ -48,9 +150,9 @@ html, body {
 
 ::selection { background: var(--accent-soft); color: var(--ink); }
 
-* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.14) transparent; }
+* { scrollbar-width: thin; scrollbar-color: var(--scrollbar-hover) transparent; }
 *::-webkit-scrollbar { width: 8px; height: 8px; }
-*::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+*::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
 *::-webkit-scrollbar-track { background: transparent; }
 
 #app {
@@ -72,7 +174,7 @@ html, body {
 	min-width: 0;
 	overflow: hidden;
 	background:
-		radial-gradient(ellipse 90% 70% at 50% 40%, rgba(78, 201, 176, 0.05), transparent 70%),
+		radial-gradient(ellipse 90% 70% at 50% 40%, var(--stage-wash), transparent 70%),
 		var(--bg);
 }
 
@@ -87,8 +189,8 @@ html, body {
 	pointer-events: none;
 	opacity: 0.5;
 	background-image:
-		linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
-		linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+		linear-gradient(var(--grid-line) 1px, transparent 1px),
+		linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
 	background-size: 48px 48px;
 }
 
@@ -98,7 +200,7 @@ html, body {
 	inset: 0;
 	z-index: 2;
 	pointer-events: none;
-	background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.5) 100%);
+	background: radial-gradient(ellipse at center, transparent 55%, var(--vignette) 100%);
 }
 
 #nav {
@@ -150,11 +252,11 @@ html, body {
 	transition: background 0.18s, color 0.18s, border-color 0.18s;
 }
 .nav-link .nav-index { font-size: 9.5px; color: var(--ink-faint); }
-.nav-link:hover { color: var(--ink); background: rgba(255,255,255,0.04); }
+.nav-link:hover { color: var(--ink); background: var(--surface); }
 .nav-link.active {
 	color: var(--accent);
 	background: var(--accent-soft);
-	border-color: rgba(78, 201, 176, 0.32);
+	border-color: var(--accent-line);
 }
 .nav-link.active .nav-index { color: var(--accent); opacity: 0.65; }
 
@@ -167,7 +269,7 @@ html, body {
 	padding: 6px 8px;
 	border-radius: var(--radius);
 }
-.nav-source:hover { color: var(--ink); background: rgba(255,255,255,0.04); }
+.nav-source:hover { color: var(--ink); background: var(--surface); }
 
 #console {
 	display: flex;
@@ -211,15 +313,15 @@ html, body {
 .console-status .dot {
 	width: 6px; height: 6px; border-radius: 50%;
 	background: var(--ink-faint);
-	box-shadow: 0 0 0 0 rgba(78, 201, 176, 0.5);
+	box-shadow: 0 0 0 0 var(--accent-glow);
 }
 .console-status[data-state="running"] .dot { background: var(--accent); animation: pulse-dot 1.4s ease-out infinite; }
 .console-status[data-state="idle"] .dot { background: var(--ink-faint); }
 .console-status[data-state="done"] .dot { background: var(--ok); }
 .console-status[data-state="error"] .dot { background: var(--danger); }
 @keyframes pulse-dot {
-	0% { box-shadow: 0 0 0 0 rgba(78, 201, 176, 0.45); }
-	100% { box-shadow: 0 0 0 7px rgba(78, 201, 176, 0); }
+	0% { box-shadow: 0 0 0 0 var(--accent-glow); }
+	100% { box-shadow: 0 0 0 7px transparent; }
 }
 
 .console-body {
@@ -312,7 +414,7 @@ html, body {
 	top: 0; bottom: 0; left: 0;
 	width: 460px;
 	pointer-events: none;
-	background: linear-gradient(to right, rgba(7, 9, 11, 0.9), rgba(7, 9, 11, 0.55) 55%, transparent);
+	background: linear-gradient(to right, var(--world-fade), var(--world-fade-soft) 55%, transparent);
 }
 
 .hud { position: absolute; pointer-events: auto; }
@@ -350,14 +452,14 @@ html, body {
 	font-family: var(--font-mono);
 	font-size: 0.92em;
 	color: var(--ink);
-	background: rgba(255,255,255,0.06);
+	background: var(--code-bg);
 	padding: 1px 5px;
 	border-radius: 3px;
 }
 .hint { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); line-height: 1.5; }
 
 .panel {
-	background: rgba(13, 17, 20, 0.86);
+	background: var(--glass);
 	border: 1px solid var(--line-strong);
 	border-radius: var(--radius);
 	padding: 12px 14px;
@@ -380,7 +482,7 @@ html, body {
 	font-size: 11px;
 	line-height: 1.65;
 	color: var(--accent);
-	background: rgba(0,0,0,0.35);
+	background: var(--pre-bg);
 	border: 1px solid var(--line);
 	border-radius: 3px;
 	padding: 8px 10px;
@@ -402,7 +504,7 @@ html, body {
 	font-size: 10.5px;
 	letter-spacing: 0.02em;
 	color: var(--ink-dim);
-	background: rgba(13, 17, 20, 0.86);
+	background: var(--glass);
 	border: 1px solid var(--line-strong);
 	border-radius: var(--radius);
 	padding: 6px 10px;
@@ -413,34 +515,34 @@ html, body {
 	backdrop-filter: blur(12px);
 	transition: color 0.18s, border-color 0.18s, background 0.18s;
 }
-.chip:hover { color: var(--ink); border-color: rgba(255,255,255,0.22); }
-.chip.active { color: var(--accent); border-color: rgba(78,201,176,0.42); background: var(--accent-soft); }
+.chip:hover { color: var(--ink); border-color: var(--line-hover); }
+.chip.active { color: var(--accent); border-color: var(--accent-line-strong); background: var(--accent-soft); }
 .chip:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .btn-action {
 	font-family: var(--font-mono);
 	font-size: 11px;
 	color: var(--ink);
-	background: rgba(255,255,255,0.05);
+	background: var(--surface-2);
 	border: 1px solid var(--line-strong);
 	border-radius: var(--radius);
 	padding: 8px 12px;
 	cursor: pointer;
 	transition: background 0.18s, border-color 0.18s;
 }
-.btn-action:hover:not(:disabled) { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.22); }
+.btn-action:hover:not(:disabled) { background: var(--surface-3); border-color: var(--line-hover); }
 .btn-action:disabled { opacity: 0.35; cursor: not-allowed; }
-.btn-action.is-warn { color: var(--signal); border-color: rgba(232,163,61,0.34); background: var(--signal-soft); }
-.btn-action.is-warn:hover:not(:disabled) { background: rgba(232,163,61,0.22); }
-.btn-action.is-danger { color: var(--danger); border-color: rgba(229,100,78,0.34); background: rgba(229,100,78,0.12); }
-.btn-action.is-danger:hover:not(:disabled) { background: rgba(229,100,78,0.2); }
+.btn-action.is-warn { color: var(--signal); border-color: var(--signal-line); background: var(--signal-soft); }
+.btn-action.is-warn:hover:not(:disabled) { background: var(--signal-hover); }
+.btn-action.is-danger { color: var(--danger); border-color: var(--danger-line); background: var(--danger-soft); }
+.btn-action.is-danger:hover:not(:disabled) { background: var(--danger-hover); }
 
 .scrubber {
 	display: flex;
 	align-items: center;
 	gap: 10px;
 	width: min(680px, calc(100% - 40px));
-	background: rgba(13, 17, 20, 0.9);
+	background: var(--glass-solid);
 	border: 1px solid var(--line-strong);
 	border-radius: var(--radius);
 	padding: 8px 12px;
@@ -449,7 +551,7 @@ html, body {
 .scrubber-btn {
 	appearance: none;
 	border: 1px solid var(--line-strong);
-	background: rgba(255,255,255,0.04);
+	background: var(--surface);
 	color: var(--ink);
 	width: 28px; height: 28px;
 	border-radius: var(--radius);
@@ -457,17 +559,17 @@ html, body {
 	display: flex; align-items: center; justify-content: center;
 	transition: background 0.18s;
 }
-.scrubber-btn:hover { background: rgba(255,255,255,0.1); }
-.scrubber-play { background: var(--accent-soft); color: var(--accent); border-color: rgba(78,201,176,0.4); }
+.scrubber-btn:hover { background: var(--surface-4); }
+.scrubber-play { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line-strong); }
 .scrubber-track { flex: 1; display: flex; gap: 3px; align-items: center; height: 28px; }
 .scrubber-node {
 	flex: 1; height: 3px; border-radius: 1px;
-	background: rgba(255,255,255,0.1);
+	background: var(--track);
 	cursor: pointer;
 	transition: background 0.2s, box-shadow 0.2s;
 }
-.scrubber-node.done { background: rgba(78,201,176,0.4); }
-.scrubber-node.active { background: var(--accent); box-shadow: 0 0 8px rgba(78,201,176,0.7); }
+.scrubber-node.done { background: var(--accent-line-strong); }
+.scrubber-node.active { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
 
 .control-row { display: flex; flex-direction: column; gap: 5px; }
 .control-label {
@@ -478,7 +580,7 @@ html, body {
 .control-label b { color: var(--accent); font-weight: 500; letter-spacing: 0; text-transform: none; font-size: 11.5px; }
 input[type="range"] {
 	appearance: none; -webkit-appearance: none;
-	width: 100%; height: 3px; background: rgba(255,255,255,0.12);
+	width: 100%; height: 3px; background: var(--track);
 	border-radius: 2px; outline: none; cursor: pointer;
 }
 input[type="range"]::-webkit-slider-thumb {
@@ -508,22 +610,22 @@ input[type="range"]::-moz-range-thumb {
 	font-size: 10.5px;
 	letter-spacing: 0.03em;
 	color: var(--ink);
-	background: rgba(7, 9, 11, 0.78);
+	background: var(--label-bg);
 	border: 1px solid var(--line-strong);
 	border-radius: 2px;
 	padding: 2px 6px;
 	white-space: nowrap;
 	transform: translate(-50%, -160%);
 }
-.label2d-dim { font-size: 9.5px; color: var(--ink-dimmer); background: rgba(7,9,11,0.6); padding: 1px 5px; }
-.label2d-key { color: var(--accent); border-color: rgba(78,201,176,0.3); }
+.label2d-dim { font-size: 9.5px; color: var(--ink-dimmer); background: var(--label-bg-dim); padding: 1px 5px; }
+.label2d-key { color: var(--accent); border-color: var(--accent-line); }
 
 .detail-card {
 	position: absolute;
 	top: 0; bottom: 0; right: 0;
 	width: 340px;
 	z-index: 40;
-	background: rgba(10, 13, 16, 0.96);
+	background: var(--glass-strong);
 	border-left: 1px solid var(--line-strong);
 	backdrop-filter: blur(16px);
 	padding: 20px 22px 24px;
@@ -536,10 +638,10 @@ input[type="range"]::-moz-range-thumb {
 	position: absolute; top: 14px; right: 16px;
 	width: 24px; height: 24px; border-radius: var(--radius);
 	border: 1px solid var(--line-strong);
-	background: rgba(255,255,255,0.04);
+	background: var(--surface);
 	color: var(--ink-dim); cursor: pointer; font-size: 14px; line-height: 1;
 }
-.detail-close:hover { color: var(--ink); background: rgba(255,255,255,0.09); }
+.detail-close:hover { color: var(--ink); background: var(--surface-3); }
 .detail-category {
 	font-family: var(--font-mono); font-size: 9.5px;
 	letter-spacing: 0.16em; text-transform: uppercase;
@@ -579,7 +681,7 @@ input[type="range"]::-moz-range-thumb {
 	font-family: var(--font-mono); letter-spacing: 0.42em;
 	font-size: 12px; color: var(--ink-dim); padding-left: 0.42em;
 }
-.loading-bar { width: 180px; height: 2px; background: rgba(255,255,255,0.09); overflow: hidden; }
+.loading-bar { width: 180px; height: 2px; background: var(--track); overflow: hidden; }
 .loading-bar span {
 	display: block; height: 100%; width: 34%;
 	background: var(--accent);
@@ -594,6 +696,126 @@ input[type="range"]::-moz-range-thumb {
 }
 #foot-credit a { color: var(--ink-faint); }
 #foot-credit a:hover { color: var(--ink-dim); }
+
+/* ---------------------------------------------------------------------------
+   Light theme — follows the operating system's setting.
+
+   One `:root` block, no exceptions: chrome, stage overlays and the three.js
+   palette all flip together. `js/theme.js` re-reads these on load and reloads
+   the page if the OS setting changes mid-session, so the canvas can never be
+   left disagreeing with the page around it.
+   --------------------------------------------------------------------------- */
+
+@media (prefers-color-scheme: light) {
+
+	:root {
+		color-scheme: light;
+
+		--bg: #f2f5f6;
+		--bg-2: #e9edef;
+		--panel: #ffffff;
+		--panel-2: #f4f7f8;
+		--panel-raised: #eef2f4;
+
+		--ink: #0e1518;
+		--ink-dim: #47555d;
+		--ink-dimmer: #6a7880;
+		--ink-faint: #78868e;
+
+		/* Darkened so they clear 4.5:1 on a white panel — the neon dark-mode
+		   accents are far too light to read as text here. */
+		--accent: #0c7a68;
+		--accent-soft: rgba(12, 122, 104, 0.1);
+		--accent-line: rgba(12, 122, 104, 0.34);
+		--accent-line-strong: rgba(12, 122, 104, 0.46);
+		--accent-glow: rgba(12, 122, 104, 0.4);
+		--signal: #96590a;
+		--signal-soft: rgba(150, 89, 10, 0.12);
+		--signal-line: rgba(150, 89, 10, 0.34);
+		--signal-hover: rgba(150, 89, 10, 0.2);
+		--info: #1f5fd0;
+		--danger: #bd3a26;
+		--danger-soft: rgba(189, 58, 38, 0.1);
+		--danger-line: rgba(189, 58, 38, 0.32);
+		--danger-hover: rgba(189, 58, 38, 0.18);
+		--ok: #2c7a3d;
+
+		--line: rgba(14, 21, 24, 0.1);
+		--line-strong: rgba(14, 21, 24, 0.16);
+		--line-hover: rgba(14, 21, 24, 0.28);
+
+		--surface: rgba(14, 21, 24, 0.04);
+		--surface-2: rgba(14, 21, 24, 0.05);
+		--surface-3: rgba(14, 21, 24, 0.09);
+		--surface-4: rgba(14, 21, 24, 0.1);
+		--track: rgba(14, 21, 24, 0.12);
+		--code-bg: rgba(14, 21, 24, 0.06);
+		--scrollbar: rgba(14, 21, 24, 0.18);
+		--scrollbar-hover: rgba(14, 21, 24, 0.26);
+
+		/* Glass is now light-on-light: white panels over a light stage. */
+		--glass: rgba(255, 255, 255, 0.86);
+		--glass-solid: rgba(255, 255, 255, 0.92);
+		--glass-strong: rgba(250, 252, 252, 0.97);
+		--label-bg: rgba(255, 255, 255, 0.86);
+		--label-bg-dim: rgba(255, 255, 255, 0.7);
+		--pre-bg: rgba(14, 21, 24, 0.05);
+
+		--stage-wash: rgba(12, 122, 104, 0.05);
+		--grid-line: rgba(14, 21, 24, 0.05);
+		--vignette: rgba(14, 21, 24, 0.13);
+		--world-fade: rgba(242, 245, 246, 0.92);
+		--world-fade-soft: rgba(242, 245, 246, 0.62);
+
+		/* three.js palette. The near-blacks invert to near-whites so meshes
+		   read as light objects lit from above, not silhouettes. The hues are
+		   kept dark and saturated — over-lit pastels vanish on this stage. */
+		--stage-bg: #f2f5f6;
+		--stage-deck: #dfe7ea;
+		--stage-grid: #b3c3c9;
+		--stage-grid-accent: #78a49b;
+		--stage-shell: #c2ced4;
+		--stage-shell-2: #bfc5d3;
+		--stage-muted: #64737c;
+		--stage-off: #b9c5cb;
+		--stage-violet: #6d4bd6;
+		--stage-rose: #b8532f;
+		--stage-cyan: #0f7f92;
+		--stage-ink: #0e1518;
+		--stage-edge: #0e1518;
+
+		/* Soft, roughly unit-strength daylight. The first light pass here ran
+		   the hemisphere at 2.4× — every material clipped toward white and the
+		   scenes lost their colour coding entirely. Keep total energy close to
+		   the dark rig and let the saturated diffuse colours carry the scene.
+		   The accent rim light is dialled back because a coloured glow on
+		   white reads as a smudge. */
+		--rig-sky: #ffffff;
+		--rig-ground: #b7c4ca;
+		--rig-key: #ffffff;
+		--rig-fill: #d5e0e5;
+		--rig-hemi-gain: 1.15;
+		--rig-key-gain: 0.75;
+		--rig-fill-gain: 0.9;
+		--rig-rim-gain: 0.25;
+		--stage-grid-gain: 1.8;
+		/* Fog toward near-white eats distant geometry much faster than fog
+		   toward black reads on a dark stage — halve it. */
+		--stage-fog-gain: 0.35;
+		--stage-shell-mix: 0.62;
+
+		--stage-emissive: 0.22;
+		--bloom-gain: 0.3;
+		--bloom-threshold: 0.92;
+
+		/* Daylight leans on IBL instead of emissive; shadows softer on
+		   white, and the hover boost is smaller since emissive is dim. */
+		--env-intensity: 0.55;
+		--stage-shadow-gain: 0.4;
+		--hover-boost: 1.45;
+	}
+
+}
 
 @media (min-width: 1100px) { .nav-brand-sub { display: inline; } }
 

@@ -1,7 +1,10 @@
 import * as THREE from 'three/webgpu';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-import { createRenderer, createLabelRenderer, createRenderPipeline, buildSceneOutput } from './utils/renderKit.js';
+import { createRenderer, createLabelRenderer, createRenderPipeline, buildSceneOutput, buildEnvironment } from './utils/renderKit.js';
+import { enableShadows } from './utils/sceneKit.js';
+import { enterWorld } from './utils/choreo.js';
+import { num } from '../../../js/theme.js';
 import { ProcessConsole } from './utils/console.js';
 import { bindViewport } from './utils/viewport.js';
 import { tweenVec3, updateTweens, Easing } from './utils/tween.js';
@@ -25,7 +28,17 @@ const viewport = document.getElementById( 'viewport' );
 const container = document.getElementById( 'webgl' );
 
 const renderer = createRenderer();
+if ( num( '--stage-shadow-gain', 0 ) > 0 ) {
+
+	renderer.shadowMap.enabled = true;
+	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+}
 container.appendChild( renderer.domElement );
+
+// The WebGPU PMREMGenerator (used for the environment map below) throws if
+// the backend has not been initialised yet, so wait for it here.
+await renderer.init();
 
 const labelRenderer = createLabelRenderer();
 container.appendChild( labelRenderer.domElement );
@@ -70,11 +83,27 @@ const worlds = {
 
 const STEPS = { tensor: TENSOR_STEPS, formats: FORMAT_STEPS, transfer: TRANSFER_STEPS, intensity: INTENSITY_STEPS };
 
+// Image-based lighting so the metallic packages have something to reflect.
+const envMap = buildEnvironment( renderer );
+Object.values( worlds ).forEach( ( world ) => {
+
+	world.scene.environment = envMap;
+	world.scene.environmentIntensity = num( '--env-intensity', 0.35 );
+	enableShadows( world.scene );
+
+} );
+
 const PLAY_ICON = '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M4 2.5v11l10-5.5z"/></svg>';
 const PAUSE_ICON = '<svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/></svg>';
 
 const sceneOutputs = {};
-for ( const key in worlds ) sceneOutputs[ key ] = buildSceneOutput( worlds[ key ].scene, camera, { strength: 0.24, radius: 0.6, threshold: 0.6 } );
+// Additive bloom reads as haze on a light stage, so the light theme dials the
+// strength down and lifts the threshold — see --bloom-* in css/base.css.
+for ( const key in worlds ) sceneOutputs[ key ] = buildSceneOutput( worlds[ key ].scene, camera, {
+	strength: 0.24 * num( '--bloom-gain', 1 ),
+	radius: 0.6,
+	threshold: num( '--bloom-threshold', 0.6 ),
+} );
 
 let currentKey = 'tensor';
 renderPipeline.outputNode = sceneOutputs.tensor;
@@ -889,7 +918,7 @@ function visibleChain( object ) {
 
 }
 
-renderer.domElement.addEventListener( 'pointerdown', ( event ) => {
+function pickTarget( event ) {
 
 	const rect = renderer.domElement.getBoundingClientRect();
 	pointer.x = ( ( event.clientX - rect.left ) / rect.width ) * 2 - 1;
@@ -899,8 +928,69 @@ renderer.domElement.addEventListener( 'pointerdown', ( event ) => {
 	const hits = raycaster.intersectObjects( worlds[ currentKey ].interactables, true )
 		.filter( ( h ) => visibleChain( h.object ) && h.object.userData.kind );
 
-	if ( ! hits.length ) return;
-	openDetail( worlds[ currentKey ].describe( hits[ 0 ].object ) );
+	return hits.length ? hits[ 0 ].object : null;
+
+}
+
+renderer.domElement.addEventListener( 'pointerdown', ( event ) => {
+
+	const hit = pickTarget( event );
+	if ( ! hit ) return;
+	openDetail( worlds[ currentKey ].describe( hit ) );
+
+} );
+
+// Hover glow: the click target under the pointer gets its emissive boosted by
+// --hover-boost. Restores are guarded — the worlds repaint cell intensities on
+// every step change and sweep tick, and a repaint's value must win.
+const HOVER_BOOST = num( '--hover-boost', 1 );
+let hoverObj = null;
+let hoverSaved = [];
+
+function clearHover() {
+
+	hoverSaved.forEach( ( { material, saved, boosted } ) => {
+
+		if ( Math.abs( material.emissiveIntensity - boosted ) < 1e-6 ) material.emissiveIntensity = saved;
+
+	} );
+	hoverSaved = [];
+	hoverObj = null;
+
+}
+
+function applyHover( obj ) {
+
+	if ( obj === hoverObj ) return;
+	clearHover();
+	if ( ! obj ) return;
+	hoverObj = obj;
+
+	const mats = Array.isArray( obj.material ) ? obj.material : [ obj.material ];
+	mats.forEach( ( m ) => {
+
+		if ( ! m || ! m.emissive || ! m.emissiveIntensity ) return;
+		const saved = m.emissiveIntensity;
+		const boosted = saved * HOVER_BOOST;
+		m.emissiveIntensity = boosted;
+		hoverSaved.push( { material: m, saved, boosted } );
+
+	} );
+
+}
+
+renderer.domElement.addEventListener( 'pointermove', ( event ) => {
+
+	const hit = pickTarget( event );
+	applyHover( hit );
+	renderer.domElement.style.cursor = hit ? 'pointer' : 'grab';
+
+} );
+
+renderer.domElement.addEventListener( 'pointerleave', () => {
+
+	clearHover();
+	renderer.domElement.style.cursor = 'grab';
 
 } );
 
@@ -936,6 +1026,7 @@ function switchWorld( key ) {
 	xferScrub.stop();
 	intScrub.stop();
 	closeDetail();
+	clearHover();
 
 	setWorldLabelsVisible( currentKey, false );
 	currentKey = key;
@@ -946,6 +1037,7 @@ function switchWorld( key ) {
 	renderPipeline.outputNode = sceneOutputs[ key ];
 	renderPipeline.needsUpdate = true;
 	setWorldLabelsVisible( key, true );
+	enterWorld( worlds[ key ].scene );
 
 	ENTER[ key ]();
 
@@ -1008,6 +1100,7 @@ renderIntTable();
 navLinks.forEach( ( b ) => b.classList.toggle( 'active', b.dataset.goto === 'tensor' ) );
 worldPanels.forEach( ( p ) => p.classList.toggle( 'is-active', p.dataset.worldPanel === 'tensor' ) );
 Object.keys( worlds ).forEach( ( key ) => setWorldLabelsVisible( key, key === 'tensor' ) );
+enterWorld( worlds.tensor.scene );
 enterTensor();
 
 setTimeout( () => document.getElementById( 'loading' ).classList.add( 'hidden' ), 700 );

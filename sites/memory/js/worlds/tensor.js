@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { addStandardLighting, createDeck, createLabel, THEME } from '../utils/sceneKit.js';
+import { addStandardLighting, createDeck, createLabel, THEME, EMISSIVE } from '../utils/sceneKit.js';
 import { createStrip, createWall, createFrame, paintCell, cellAt } from '../utils/tensorKit.js';
 
 const ROWS = 6;
@@ -86,7 +86,7 @@ export function buildTensorWorld() {
 
 	const cursor = new THREE.Mesh(
 		new THREE.ConeGeometry( 0.14, 0.3, 4 ),
-		new THREE.MeshStandardMaterial( { color: THEME.signal, emissive: THEME.signal, emissiveIntensity: 0.9 } ),
+		new THREE.MeshStandardMaterial( { color: THEME.signal, emissive: THEME.signal, emissiveIntensity: 0.9 * EMISSIVE } ),
 	);
 	cursor.rotation.x = Math.PI;
 	cursor.visible = false;

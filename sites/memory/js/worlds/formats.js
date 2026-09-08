@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { addStandardLighting, createDeck, createLabel, THEME } from '../utils/sceneKit.js';
+import { addStandardLighting, createDeck, createLabel, THEME, EMISSIVE } from '../utils/sceneKit.js';
 import { createStrip, createBar, setBar, paintCell, cellMesh } from '../utils/tensorKit.js';
 import { FORMATS, BY_KEY, quantize, quantizeBlock, bitArray, fieldOf, bytesOf, bitsPerValue, numel, SHAPES, sci, GIB } from '../data/formats.js';
 
@@ -141,7 +141,7 @@ export function buildFormatsWorld() {
 		const w = 0.12 + f.m * 0.055;
 		const col = new THREE.Mesh(
 			new THREE.BoxGeometry( w, hi - lo, w ),
-			new THREE.MeshStandardMaterial( { color: THEME.accent, emissive: THEME.accent, emissiveIntensity: 0.35, roughness: 0.4, transparent: true, opacity: 0.9 } ),
+			new THREE.MeshStandardMaterial( { color: THEME.accent, emissive: THEME.accent, emissiveIntensity: 0.35 * EMISSIVE, roughness: 0.4, transparent: true, opacity: 0.9 } ),
 		);
 		col.position.set( ( i - 2.5 ) * 1.7, ( lo + hi ) / 2, 0 );
 		col.userData = { kind: 'range', format: f.key };
@@ -231,7 +231,9 @@ export function buildFormatsWorld() {
 		block.visible = step >= 5;
 		bars.visible = step >= 6;
 		shapeLabel.visible = step >= 6;
-		ladder.visible = step === 7 || step === 0;
+		// Not shown on the intro step: at that camera the ladder sits half out
+		// of frame on the right and reads as a rendering glitch.
+		ladder.visible = step === 7;
 		head.visible = step <= 1;
 
 	}

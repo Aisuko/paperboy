@@ -4,7 +4,7 @@
 	<meta charset="utf-8" />
 	<title>paperboy — 3D field guides for hard-to-see systems</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
-	<meta name="description" content="paperboy is a small collection of interactive three.js/WebGPU field guides that make hard-to-see systems easy to explore in 3D: a GNU/Hurd microkernel tour, and a memory-accounting guide to tensors, float formats, the trip from host RAM to GPU HBM, and the arithmetic intensity that separates memory-bound from compute-bound kernels." />
+	<meta name="description" content="paperboy is a small collection of interactive three.js/WebGPU field guides that make hard-to-see systems easy to explore in 3D: a GNU/Hurd microkernel tour, a memory-accounting guide to tensors, float formats, the trip from host RAM to GPU HBM and arithmetic intensity, and an LM-head guide to the linear layer that turns a transformer's hidden state into logits, softmax and the next word." />
 	<link rel="icon" href="favicon.svg" type="image/svg+xml" />
 	<link rel="stylesheet" href="css/main.css" />
 </head>
@@ -32,6 +32,7 @@
 				<h3>Featured</h3>
 				<a href="sites/hurd/">GNU / Hurd &rarr;</a>
 				<a href="sites/memory/">Memory accounting &rarr;</a>
+				<a href="sites/lmhead/">LM head &rarr;</a>
 			</div>
 			<div class="side-group">
 				<h3>Code</h3>
@@ -171,6 +172,44 @@
 					</div>
 				</a>
 
+				<a class="gallery-tile" href="sites/lmhead/" data-tilt>
+					<div class="gallery-visual">
+						<svg class="node-graph" viewBox="0 0 400 260" aria-hidden="true">
+							<g class="ng-edges" stroke="currentColor" fill="none">
+								<line x1="60" y1="40" x2="60" y2="200" />
+								<line x1="60" y1="120" x2="120" y2="120" />
+								<line x1="150" y1="200" x2="150" y2="150" />
+								<line x1="185" y1="200" x2="185" y2="90" />
+								<line x1="220" y1="200" x2="220" y2="55" />
+								<line x1="255" y1="200" x2="255" y2="120" />
+								<line x1="290" y1="200" x2="290" y2="165" />
+								<line x1="325" y1="200" x2="325" y2="180" />
+								<line x1="130" y1="200" x2="345" y2="200" />
+							</g>
+							<g class="ng-nodes">
+								<circle cx="60" cy="40" r="6" /> <circle cx="60" cy="80" r="6" /> <circle cx="60" cy="120" r="6" class="ng-core" /> <circle cx="60" cy="160" r="6" /> <circle cx="60" cy="200" r="6" />
+								<circle cx="150" cy="150" r="5" /> <circle cx="185" cy="90" r="5" /> <circle cx="220" cy="55" r="5" class="ng-core" /> <circle cx="255" cy="120" r="5" /> <circle cx="290" cy="165" r="5" /> <circle cx="325" cy="180" r="5" />
+							</g>
+						</svg>
+						<span class="gallery-badge">live &middot; 3D tour</span>
+					</div>
+					<div class="gallery-body">
+						<div class="gallery-kicker">Logits &middot; softmax &middot; weight tying</div>
+						<h3>The LM head <span class="arrow">&rarr;</span></h3>
+						<p>
+							The last layer of a language model: how one hidden vector times one
+							d&times;V matrix becomes a score for every word, why the layer is linear,
+							what temperature does to the distribution, and why the &ldquo;small
+							head&rdquo; is often the biggest matrix in the model.
+						</p>
+						<div class="gallery-tags">
+							<span>three.js</span>
+							<span>WebGPU</span>
+							<span>transformers</span>
+						</div>
+					</div>
+				</a>
+
 				<div class="gallery-tile gallery-tile--soon" data-tilt>
 					<div class="gallery-visual gallery-visual--soon">
 						<span class="soon-icon">?</span>
@@ -217,7 +256,8 @@
 	<script type="importmap">
 		{
 			"imports": {
-				"three": "./sites/hurd/vendor/three/build/three.module.js"
+				"three": "./sites/hurd/vendor/three/build/three.module.js",
+				"three/addons/": "./sites/hurd/vendor/three/jsm/"
 			}
 		}
 	</script>

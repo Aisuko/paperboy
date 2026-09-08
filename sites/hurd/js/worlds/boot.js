@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BOOT_STEPS } from '../data/bootSteps.js';
-import { addStandardLighting, createLabel } from '../utils/sceneKit.js';
+import { addStandardLighting, createLabel, THEME, EMISSIVE } from '../utils/sceneKit.js';
 import { buildSystemMap, KERNEL_Y, USER_Y } from '../utils/systemMap.js';
 
 // 03 · What starts first. Same machine as the overview page, but dark: each
@@ -20,7 +20,7 @@ export function buildBootWorld() {
 	// GRUB sits below the kernel: firmware handing over, outside the Hurd.
 	const grub = new THREE.Mesh(
 		new THREE.BoxGeometry( 0.9, 0.12, 0.55 ),
-		new THREE.MeshStandardMaterial( { color: 0x0e1418, emissive: 0x6b7880, emissiveIntensity: 0.18, metalness: 0.5, roughness: 0.6 } ),
+		new THREE.MeshStandardMaterial( { color: THEME.shell, emissive: THEME.muted, emissiveIntensity: 0.18 * EMISSIVE, metalness: 0.5, roughness: 0.6 } ),
 	);
 	grub.position.set( 0, KERNEL_Y - 0.62, 3.1 );
 	map.group.add( grub );
@@ -50,7 +50,7 @@ export function buildBootWorld() {
 
 		} );
 
-		grub.material.emissiveIntensity = currentIndex === 0 ? 0.6 : 0.12;
+		grub.material.emissiveIntensity = ( currentIndex === 0 ? 0.6 : 0.12 ) * EMISSIVE;
 		login.element.style.opacity = currentIndex === BOOT_STEPS.length - 1 ? '1' : '0';
 
 	}

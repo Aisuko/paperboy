@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { addStandardLighting, createDeck, createLabel, THEME } from '../utils/sceneKit.js';
+import { addStandardLighting, createDeck, createLabel, THEME, EMISSIVE } from '../utils/sceneKit.js';
 import { createStrip, createWall, createFrame, createRail, paintCell, cellMesh } from '../utils/tensorKit.js';
 import { BY_KEY, LINKS, bytesOf, bitsPerValue, numel, SHAPES, fmtBytes, fmtTime } from '../data/formats.js';
 
@@ -36,13 +36,13 @@ const VIEWS = [
 ];
 
 // Establishing shot: host DRAM, CPU package, the bus and the GPU package in frame.
-const OVERVIEW = { position: new THREE.Vector3( -1.0, 1.4, 27.5 ), target: new THREE.Vector3( -1.0, 0.15, 0 ) };
+const OVERVIEW = { position: new THREE.Vector3( -1.0, 1.6, 29.5 ), target: new THREE.Vector3( -1.0, 0.15, 0 ) };
 
 function slab( w, h, d, color, level = 0.35 ) {
 
 	return new THREE.Mesh(
 		new THREE.BoxGeometry( w, h, d ),
-		new THREE.MeshStandardMaterial( { color, emissive: color, emissiveIntensity: level, roughness: 0.42, metalness: 0.15 } ),
+		new THREE.MeshStandardMaterial( { color, emissive: color, emissiveIntensity: level * EMISSIVE, roughness: 0.42, metalness: 0.15 } ),
 	);
 
 }
@@ -241,12 +241,12 @@ export function buildTransferWorld() {
 	label( 'l3', `shared L3 · ~${ BW.l3 } TB/s`, 'label2d label2d-dim', L3_X, -0.98 );
 	label( 'cpu', 'CPU package', 'label2d label2d-key', -6.6, -1.6 );
 	label( 'rc', 'PCIe root complex', 'label2d label2d-dim', RC_X, 0.3 );
-	label( 'bus', '', 'label2d label2d-key', -0.6, 0.5 );
-	label( 'time', '', 'label2d label2d-dim', -0.6, 0.02 );
+	label( 'bus', '', 'label2d label2d-key', -0.6, 1.1 );
+	label( 'time', '', 'label2d label2d-dim', -0.6, 0.62 );
 	label( 'ep', 'copy engine', 'label2d label2d-dim', EP_X, 0.3 );
 	label( 'hbm', `HBM3e · ~${ BW.hbm } TB/s`, 'label2d label2d-dim', HBM_X[ 0 ], 2.85 );
 	label( 'hbm2', `HBM3e · ~${ BW.hbm } TB/s`, 'label2d label2d-dim', HBM_X[ 1 ], 2.85 );
-	label( 'sms', `8 SMs · Reg ~${ BW.greg } · L1+SMEM ~${ BW.smem } TB/s`, 'label2d label2d-key', GPU_X, 2.9 );
+	label( 'sms', `8 SMs · Reg ~${ BW.greg } · L1+SMEM ~${ BW.smem } TB/s`, 'label2d label2d-key', GPU_X, 3.6 );
 	label( 'gl2', `L2 · ~${ BW.gl2 } TB/s`, 'label2d label2d-dim', GPU_X, -1.18 );
 	label( 'die', 'GPU package · die + HBM', 'label2d label2d-key', 7.4, -1.6 );
 
@@ -275,23 +275,23 @@ export function buildTransferWorld() {
 		bounce.visible = ! isPinned;
 		labels.bounce.visible = ! isPinned;
 
-		pages.userData.cells.forEach( ( c ) => paintCell( c, isPinned ? THEME.muted : THEME.info, isPinned ? 0.2 : 0.5 ) );
-		pinned.userData.cells.forEach( ( c ) => paintCell( c, isPinned ? THEME.accent : THEME.muted, isPinned ? 0.7 : 0.2 ) );
+		pages.userData.cells.forEach( ( c ) => paintCell( c, isPinned ? THEME.muted : THEME.info, isPinned ? 0.35 : 0.55 ) );
+		pinned.userData.cells.forEach( ( c ) => paintCell( c, isPinned ? THEME.accent : THEME.muted, isPinned ? 0.7 : 0.3 ) );
 		paintCell( bounce, THEME.rose, 0.6 );
 
 		const hostHot = step <= 2;
-		coreRegs.forEach( ( c ) => paintCell( c, THEME.accent, hostHot ? 0.6 : 0.2 ) );
-		coreL1s.forEach( ( c ) => paintCell( c, THEME.info, hostHot ? 0.5 : 0.2 ) );
-		coreL2s.forEach( ( c ) => paintCell( c, THEME.violet, hostHot ? 0.45 : 0.2 ) );
-		l3.material.emissiveIntensity = hostHot ? 0.6 : 0.25;
-		imc.material.emissiveIntensity = hostHot ? 0.5 : 0.25;
-		rootComplex.material.emissiveIntensity = step === 2 ? 0.7 : 0.25;
-		endpoint.material.emissiveIntensity = step === 2 ? 0.7 : 0.25;
+		coreRegs.forEach( ( c ) => paintCell( c, THEME.accent, hostHot ? 0.6 : 0.25 ) );
+		coreL1s.forEach( ( c ) => paintCell( c, THEME.info, hostHot ? 0.5 : 0.25 ) );
+		coreL2s.forEach( ( c ) => paintCell( c, THEME.violet, hostHot ? 0.45 : 0.25 ) );
+		l3.material.emissiveIntensity = ( hostHot ? 0.6 : 0.25 ) * EMISSIVE;
+		imc.material.emissiveIntensity = ( hostHot ? 0.5 : 0.25 ) * EMISSIVE;
+		rootComplex.material.emissiveIntensity = ( step === 2 ? 0.7 : 0.25 ) * EMISSIVE;
+		endpoint.material.emissiveIntensity = ( step === 2 ? 0.7 : 0.25 ) * EMISSIVE;
 
-		smRegs.forEach( ( c ) => paintCell( c, THEME.accent, step >= 4 ? 0.8 : 0.2 ) );
-		smShared.forEach( ( c ) => paintCell( c, THEME.info, step >= 4 ? 0.7 : 0.2 ) );
-		gl2.material.emissiveIntensity = step >= 4 ? 0.85 : 0.3;
-		stacks.forEach( ( s ) => ( s.material.emissiveIntensity = step >= 3 ? 0.8 : 0.3 ) );
+		smRegs.forEach( ( c ) => paintCell( c, THEME.accent, step >= 4 ? 0.8 : 0.25 ) );
+		smShared.forEach( ( c ) => paintCell( c, THEME.info, step >= 4 ? 0.7 : 0.25 ) );
+		gl2.material.emissiveIntensity = ( step >= 4 ? 0.85 : 0.3 ) * EMISSIVE;
+		stacks.forEach( ( s ) => ( s.material.emissiveIntensity = ( step >= 3 ? 0.8 : 0.3 ) * EMISSIVE ) );
 		packets.forEach( ( p ) => ( p.visible = step >= 2 ) );
 
 	}
@@ -439,7 +439,7 @@ export function buildTransferWorld() {
 				p.userData.t = ( p.userData.t + dt * speed / ( BUS_B - BUS_A ) ) % 1;
 				const t = p.userData.t;
 				p.position.set( BUS_A + t * ( BUS_B - BUS_A ), BUS_Y, ( p.userData.index % 2 ? 0.5 : -0.5 ) );
-				p.material.emissiveIntensity = 0.4 + Math.sin( flow * 4 + p.userData.index ) * 0.2 + burst * 0.5;
+				p.material.emissiveIntensity = ( 0.4 + Math.sin( flow * 4 + p.userData.index ) * 0.2 + burst * 0.5 ) * EMISSIVE;
 
 			} );
 

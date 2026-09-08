@@ -3,7 +3,7 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { getComponent, CATEGORIES } from '../data/components.js';
 import { createComponentObject, setNodeState, animateComponent } from '../components3d.js';
-import { addStandardLighting, createDeck } from '../utils/sceneKit.js';
+import { addStandardLighting, createDeck, THEME, EMISSIVE, shellColor } from '../utils/sceneKit.js';
 import { IPCLink } from '../utils/ipcLink.js';
 import { tween, Easing } from '../utils/tween.js';
 
@@ -24,10 +24,10 @@ const KERNEL_ROW_Y = 0.5;
 const BASE_Y = -2.2;
 
 const MONO_LAYERS = [
-	{ label: 'VFS, system call', color: 0xe8a33d },
-	{ label: 'IPC, file system', color: 0xa78bfa },
-	{ label: 'Scheduler, virtual memory', color: 0x6ea8fe },
-	{ label: 'Device drivers, dispatcher, …', color: 0x9aa8b0 },
+	{ label: 'VFS, system call', color: THEME.signal },
+	{ label: 'IPC, file system', color: THEME.violet },
+	{ label: 'Scheduler, virtual memory', color: THEME.info },
+	{ label: 'Device drivers, dispatcher, …', color: THEME.muted },
 ];
 
 // The Hurd's real servers standing in for the textbook microkernel roles.
@@ -49,7 +49,7 @@ const HYBRID_SERVERS = [
 	{ role: 'File server', id: 'hybrid-file', category: 'filesystem', shape: 'disk', inKernel: true },
 ];
 
-const APP_COLOR = 0x6fcf7f;
+const APP_COLOR = THEME.ok;
 
 function addLabel( parent, text, y, extraClass, x = 0 ) {
 
@@ -68,7 +68,7 @@ function buildAppNode() {
 	const group = new THREE.Group();
 	const geo = new RoundedBoxGeometry( 1.05, 0.4, 0.6, 3, 0.07 );
 	const body = new THREE.Mesh( geo, new THREE.MeshStandardMaterial( {
-		color: 0x14141c, emissive: APP_COLOR, emissiveIntensity: 0.4, metalness: 0.55, roughness: 0.3,
+		color: shellColor( APP_COLOR, THEME.shell2 ), emissive: APP_COLOR, emissiveIntensity: 0.4 * EMISSIVE, metalness: 0.55, roughness: 0.3,
 	} ) );
 	group.add( body );
 	group.add( new THREE.LineSegments(
@@ -88,7 +88,7 @@ function buildBoundary( halfWidth ) {
 	const geo = new THREE.BufferGeometry().setFromPoints( [
 		new THREE.Vector3( -halfWidth, 0, 0 ), new THREE.Vector3( halfWidth, 0, 0 ),
 	] );
-	const line = new THREE.Line( geo, new THREE.LineBasicMaterial( { color: 0xffffff, transparent: true, opacity: 0.3 } ) );
+	const line = new THREE.Line( geo, new THREE.LineBasicMaterial( { color: THEME.edge, transparent: true, opacity: 0.3 } ) );
 	group.add( line );
 	group.position.y = BOUNDARY_Y;
 
@@ -113,7 +113,7 @@ function buildMonolith() {
 	MONO_LAYERS.forEach( ( layer, i ) => {
 
 		const mat = new THREE.MeshStandardMaterial( {
-			color: 0x14141c, emissive: layer.color, emissiveIntensity: 0.32, metalness: 0.6, roughness: 0.35,
+			color: shellColor( layer.color, THEME.shell2 ), emissive: layer.color, emissiveIntensity: 0.32 * EMISSIVE, metalness: 0.6, roughness: 0.35,
 		} );
 		const mesh = new THREE.Mesh( new THREE.BoxGeometry( 1.9, h, 1.9 ), mat );
 		mesh.position.y = -1.9 + i * h;
@@ -126,7 +126,7 @@ function buildMonolith() {
 
 	const outline = new THREE.LineSegments(
 		new THREE.EdgesGeometry( new THREE.BoxGeometry( 1.92, h * 4, 1.92 ) ),
-		new THREE.LineBasicMaterial( { color: 0xffffff, transparent: true, opacity: 0.35 } ),
+		new THREE.LineBasicMaterial( { color: THEME.edge, transparent: true, opacity: 0.35 } ),
 	);
 	outline.position.y = -1.9 + h * 1.5;
 	group.add( outline );
@@ -183,7 +183,7 @@ function buildColumn( kind ) {
 		group.add( mono.group );
 		layerMeshes = mono.layerMeshes;
 
-		links.push( new IPCLink( group, new THREE.Vector3( 0, -1.9 + 0.42 * 3.5, 0 ), appNode.position.clone(), 0xe8a33d, {
+		links.push( new IPCLink( group, new THREE.Vector3( 0, -1.9 + 0.42 * 3.5, 0 ), appNode.position.clone(), THEME.signal, {
 			particleCount: 2, speed: 0.32, radius: 0.016, arc: 0.5,
 		} ) );
 
@@ -211,7 +211,7 @@ function buildColumn( kind ) {
 
 		serverNodes.forEach( ( node ) => {
 
-			const color = CATEGORIES[ node.userData.category ] ? CATEGORIES[ node.userData.category ].color : 0x4ec9b0;
+			const color = CATEGORIES[ node.userData.category ] ? CATEGORIES[ node.userData.category ].color : THEME.accent;
 			links.push( new IPCLink( group, appNode.position.clone(), node.position.clone(), color, {
 				particleCount: 1, speed: 0.3, radius: 0.014, arc: 0.4,
 			} ) );
@@ -273,7 +273,7 @@ export function buildCompareWorld() {
 		if ( crashing ) return;
 		crashing = true;
 
-		const crashColor = new THREE.Color( 0xe5644e );
+		const crashColor = new THREE.Color( THEME.danger );
 
 		// 1. Monolithic: a fault anywhere in the fused kernel takes it all down.
 		setNote( 'Monolithic: a bug in the filesystem driver runs in kernel space — it takes the whole kernel down with it.' );
@@ -284,7 +284,7 @@ export function buildCompareWorld() {
 
 				const flash = 0.5 + 0.5 * Math.sin( t * Math.PI * 6 );
 				m.material.emissive.lerpColors( monoOriginal[ i ], crashColor, Math.min( 1, t * 1.4 ) * ( 0.6 + 0.4 * flash ) );
-				m.material.emissiveIntensity = 0.3 + flash * 0.6;
+				m.material.emissiveIntensity = ( 0.3 + flash * 0.6 ) * EMISSIVE;
 
 			} );
 
@@ -369,7 +369,7 @@ export function buildCompareWorld() {
 				monoCol.layerMeshes.forEach( ( m, i ) => {
 
 					m.material.emissive.lerpColors( crashColor, monoOriginal[ i ], t );
-					m.material.emissiveIntensity = 0.32;
+					m.material.emissiveIntensity = 0.32 * EMISSIVE;
 
 				} );
 				monoCol.group.position.y = -0.35 + t * 0.35;

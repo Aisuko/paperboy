@@ -33,7 +33,7 @@ body[data-world="components"] .console-foot { display: none; }
 	font-size: 10.5px;
 	line-height: 1.65;
 	color: var(--accent);
-	background: rgba(0,0,0,0.4);
+	background: var(--pre-bg);
 	border: 1px solid var(--line);
 	border-radius: 3px;
 	padding: 8px 10px;

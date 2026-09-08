@@ -1,9 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
 
+/* Theme tokens — same arrangement as css/base.css: dark is the default set and
+   the `prefers-color-scheme: light` block at the bottom flips every one of
+   them. No region is pinned; the hero canvas is themed in JS from the
+   `--hero-*` tokens below, so the whole page moves as one. */
+
 :root {
 	color-scheme: dark;
 	--bg: #07090b;
 	--bg-2: #0d1114;
+	--card: #0d1114;
 	--ink: #dfe6ea;
 	--ink-dim: #9aa8b0;
 	--ink-dimmer: #6b7880;
@@ -11,6 +17,25 @@
 	--accent-2: #e8a33d;
 	--accent-3: #6ea8fe;
 	--line: rgba(255,255,255,0.09);
+	--surface-faint: rgba(255,255,255,0.02);
+	--grid-line: rgba(255,255,255,0.018);
+	--visual-bg: #0b0f12;
+	--visual-glow-a: rgba(78,201,176,0.14);
+	--visual-glow-b: rgba(232,163,61,0.1);
+	--badge-bg: rgba(7,9,11,0.6);
+	--tile-glow: rgba(78,201,176,0.35);
+	--fab-shadow: rgba(0,0,0,0.6);
+
+	/* Read at load by js/theme.js and handed to js/hero-scene.js. */
+	--hero-fog: #07090b;
+	--hero-a: #4ec9b0;
+	--hero-b: #6ea8fe;
+	--hero-c: #e8a33d;
+	--hero-env-intensity: 0.5;
+	--hero-bloom-strength: 0.55;
+	--hero-bloom-threshold: 0.55;
+	--hero-star-opacity: 0.5;
+
 	--sidebar-w: 250px;
 	--font-display: 'Inter', system-ui, -apple-system, sans-serif;
 	--font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
@@ -38,8 +63,8 @@ body::before {
 	pointer-events: none;
 	opacity: 0.5;
 	background-image:
-		linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
-		linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+		linear-gradient(var(--grid-line) 1px, transparent 1px),
+		linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
 	background-size: 48px 48px;
 }
 
@@ -106,7 +131,16 @@ body::before {
 	z-index: 10;
 	margin-left: var(--sidebar-w);
 	min-height: 100vh;
+	/* #main covers the fixed canvas, so it must not swallow pointer events —
+	   drag-to-orbit happens in the empty hero space. Every real surface
+	   re-enables itself below. */
+	pointer-events: none;
 }
+#main .topbar,
+#main .hero > *,
+#main .projects,
+#main .about,
+#main #foot { pointer-events: auto; }
 
 .topbar {
 	display: flex;
@@ -164,7 +198,7 @@ body::before {
 }
 .btn-primary { background: var(--ink); color: var(--bg); }
 .btn-primary:hover { transform: translateY(-2px); }
-.btn-ghost { border: 1px solid var(--line); color: var(--ink-dim); background: rgba(255,255,255,0.02); }
+.btn-ghost { border: 1px solid var(--line); color: var(--ink-dim); background: var(--surface-faint); }
 .btn-ghost:hover { border-color: var(--accent); color: var(--ink); }
 
 .hero-hint {
@@ -195,7 +229,7 @@ body::before {
 .gallery-tile {
 	display: flex;
 	flex-direction: column;
-	background: var(--bg-2);
+	background: var(--card);
 	border: 1px solid var(--line);
 	border-radius: 18px;
 	overflow: hidden;
@@ -212,14 +246,14 @@ body::before {
 .gallery-tile--featured .gallery-body { flex: 1; }
 a.gallery-tile:hover {
 	border-color: var(--accent);
-	box-shadow: 0 24px 60px -30px rgba(78,201,176,0.35);
+	box-shadow: 0 24px 60px -30px var(--tile-glow);
 }
 .gallery-visual {
 	position: relative;
 	background:
-		radial-gradient(circle at 30% 20%, rgba(78,201,176,0.14), transparent 55%),
-		radial-gradient(circle at 80% 80%, rgba(232,163,61,0.1), transparent 55%),
-		#0b0f12;
+		radial-gradient(circle at 30% 20%, var(--visual-glow-a), transparent 55%),
+		radial-gradient(circle at 80% 80%, var(--visual-glow-b), transparent 55%),
+		var(--visual-bg);
 	min-height: 200px;
 	display: flex;
 	align-items: center;
@@ -240,7 +274,7 @@ a.gallery-tile:hover {
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	color: var(--ink);
-	background: rgba(7,9,11,0.6);
+	background: var(--badge-bg);
 	border: 1px solid var(--line);
 	padding: 5px 10px;
 	border-radius: 999px;
@@ -292,6 +326,9 @@ a.gallery-tile:hover {
 	flex-wrap: wrap;
 	gap: 10px;
 	padding: 26px 40px 40px;
+	/* #hero-webgl is fixed, so a section without its own background lets the
+	   constellation scroll past behind it. */
+	background: var(--bg);
 	border-top: 1px solid var(--line);
 	font-size: 12px;
 	color: var(--ink-dimmer);
@@ -312,10 +349,59 @@ a.gallery-tile:hover {
 	font-size: 13px;
 	font-weight: 500;
 	text-decoration: none;
-	box-shadow: 0 12px 30px -10px rgba(0,0,0,0.6);
+	box-shadow: 0 12px 30px -10px var(--fab-shadow);
 	transition: transform 0.15s ease;
 }
 .fab:hover { transform: translateY(-2px); }
+
+/* ---------------------------------------------------------------------------
+   Light theme — follows the operating system's setting.
+
+   One `:root` block, no pinned regions. The topbar and hero sit directly on
+   the WebGL canvas, which is `alpha: true` and therefore shows the page's own
+   `--bg`; its particles are recoloured from `--hero-*` by js/hero-scene.js.
+   --------------------------------------------------------------------------- */
+
+@media (prefers-color-scheme: light) {
+
+	:root {
+		color-scheme: light;
+		--bg: #f2f5f6;
+		--bg-2: #ffffff;
+		--card: #ffffff;
+		--ink: #0e1518;
+		--ink-dim: #47555d;
+		--ink-dimmer: #6a7880;
+		--accent: #0c7a68;
+		--accent-2: #96590a;
+		--accent-3: #1f5fd0;
+		--line: rgba(14,21,24,0.12);
+		--surface-faint: rgba(14,21,24,0.03);
+		--grid-line: rgba(14,21,24,0.05);
+		--visual-bg: #eaf0f1;
+		--visual-glow-a: rgba(12,122,104,0.12);
+		--visual-glow-b: rgba(150,89,10,0.1);
+		--badge-bg: rgba(255,255,255,0.78);
+		--tile-glow: rgba(14,21,24,0.3);
+		--fab-shadow: rgba(14,21,24,0.35);
+
+		/* Darker accents and much less bloom, or the lattice reads as a
+		   grey wash on the white page. */
+		--hero-fog: #f2f5f6;
+		--hero-a: #0c7a68;
+		--hero-b: #1f5fd0;
+		--hero-c: #96590a;
+		--hero-env-intensity: 0.8;
+		--hero-bloom-strength: 0.18;
+		--hero-bloom-threshold: 0.9;
+		--hero-star-opacity: 0.25;
+	}
+
+	/* Teal → amber (the dark-mode pair) meets in a muddy olive on white;
+	   teal → blue keeps both ends dark enough and the blend clean. */
+	.hero h1 em { background-image: linear-gradient(90deg, var(--accent), var(--accent-3)); }
+
+}
 
 @media (max-width: 900px) {
 	:root { --sidebar-w: 0px; }

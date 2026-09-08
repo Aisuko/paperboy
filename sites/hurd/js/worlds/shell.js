@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CATEGORIES } from '../data/components.js';
 import { createComponentObject, setNodeState, animateComponent } from '../components3d.js';
-import { addStandardLighting, createLabel, disposeLink } from '../utils/sceneKit.js';
+import { addStandardLighting, createLabel, disposeLink, THEME } from '../utils/sceneKit.js';
 import { buildSystemMap, USER_Y } from '../utils/systemMap.js';
 import { IPCLink } from '../utils/ipcLink.js';
 
@@ -75,7 +75,7 @@ export function buildShellWorld() {
 			const from = positionOf( steps[ i - 1 ].componentId );
 			const to = positionOf( steps[ i ].componentId );
 			const comp = steps[ i ].componentId;
-			const color = CATEGORIES[ map.get( comp )?.userData.category ]?.color ?? 0x4ec9b0;
+			const color = CATEGORIES[ map.get( comp )?.userData.category ]?.color ?? THEME.accent;
 
 			const link = new IPCLink( map.group, from, to, color, {
 				particleCount: 2, speed: 0.55, radius: 0.016, arc: 0.75, tubeOpacity: 0.16,

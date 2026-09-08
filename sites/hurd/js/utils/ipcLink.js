@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { THEME } from './sceneKit.js';
 
 // A Mach IPC channel drawn as a directed message path: a thin conduit, a cone
 // arrowhead at the receiving end, and message packets travelling from sender
@@ -11,7 +12,7 @@ const _tangent = new THREE.Vector3();
 
 export class IPCLink {
 
-	constructor( parent, start, end, color = 0x4ec9b0, {
+	constructor( parent, start, end, color = THEME.accent, {
 		particleCount = 2,
 		speed = 0.4,
 		radius = 0.012,

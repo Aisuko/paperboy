@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { addStandardLighting, createDeck, createLabel, THEME } from '../utils/sceneKit.js';
+import { addStandardLighting, createDeck, createLabel, THEME, RIM_GAIN, EMISSIVE } from '../utils/sceneKit.js';
 
 // 07 · Boot it for real. The full QEMU console log lives in the left-hand
 // console; this pane is the machine that log is coming out of — a virtual box
@@ -12,6 +12,10 @@ const SCREEN_H = 576;
 const LINE_H = 34;
 const VISIBLE_LINES = 13;
 
+// The CRT is the one thing that does *not* follow the theme. It depicts a
+// physical screen inside the scene, and a real terminal is dark whatever the
+// desktop around it is doing — so these literals stay literals. The chassis
+// around it (bezel, stand, LEDs) does flip, via THEME above.
 const LOG_COLORS = {
 	cmd: '#4ec9b0',
 	ok: '#6fcf7f',
@@ -84,8 +88,12 @@ export function buildQemuWorld() {
 	monitor.position.set( 0, 0.55, 0 );
 	rig.add( monitor );
 
+	// Low metalness + a whisper of emissive: an unlit metallic slab has nothing
+	// to reflect here and disappears into the dark stage entirely.
 	const bezelGeo = new THREE.BoxGeometry( 3.5, 2.2, 0.16 );
-	const bezel = new THREE.Mesh( bezelGeo, new THREE.MeshStandardMaterial( { color: 0x1a2227, metalness: 0.45, roughness: 0.6 } ) );
+	const bezel = new THREE.Mesh( bezelGeo, new THREE.MeshStandardMaterial( {
+		color: THEME.shell, emissive: THEME.muted, emissiveIntensity: 0.22 * EMISSIVE, metalness: 0.2, roughness: 0.6,
+	} ) );
 	monitor.add( bezel );
 	monitor.add( new THREE.LineSegments(
 		new THREE.EdgesGeometry( bezelGeo ),
@@ -100,20 +108,20 @@ export function buildQemuWorld() {
 	screen.position.set( 0, 0.14, 0.085 );
 	monitor.add( screen );
 
-	const screenGlow = new THREE.PointLight( THEME.accent, 1.4, 5 );
+	const screenGlow = new THREE.PointLight( THEME.accent, 1.4 * RIM_GAIN, 5 );
 	screenGlow.position.set( 0, 0, 1.1 );
 	monitor.add( screenGlow );
 
 	const stand = new THREE.Mesh(
 		new THREE.CylinderGeometry( 0.08, 0.12, 0.5, 12 ),
-		new THREE.MeshStandardMaterial( { color: 0x151c21, metalness: 0.6, roughness: 0.4 } ),
+		new THREE.MeshStandardMaterial( { color: THEME.shell2, emissive: THEME.muted, emissiveIntensity: 0.18 * EMISSIVE, metalness: 0.2, roughness: 0.4 } ),
 	);
 	stand.position.set( 0, -1.5, 0 );
 	monitor.add( stand );
 
 	const foot = new THREE.Mesh(
 		new THREE.CylinderGeometry( 0.6, 0.68, 0.06, 24 ),
-		new THREE.MeshStandardMaterial( { color: 0x151c21, metalness: 0.6, roughness: 0.5 } ),
+		new THREE.MeshStandardMaterial( { color: THEME.shell2, emissive: THEME.muted, emissiveIntensity: 0.18 * EMISSIVE, metalness: 0.2, roughness: 0.5 } ),
 	);
 	foot.position.set( 0, -1.78, 0 );
 	monitor.add( foot );
@@ -122,14 +130,14 @@ export function buildQemuWorld() {
 	// flickers whenever a new line arrives.
 	const powerLed = new THREE.Mesh(
 		new THREE.SphereGeometry( 0.035, 12, 12 ),
-		new THREE.MeshBasicMaterial( { color: 0x38424a } ),
+		new THREE.MeshBasicMaterial( { color: THEME.muted } ),
 	);
 	powerLed.position.set( 1.56, -0.94, 0.09 );
 	monitor.add( powerLed );
 
 	const diskLed = new THREE.Mesh(
 		new THREE.SphereGeometry( 0.028, 12, 12 ),
-		new THREE.MeshBasicMaterial( { color: 0x38424a } ),
+		new THREE.MeshBasicMaterial( { color: THEME.muted } ),
 	);
 	diskLed.position.set( 1.4, -0.94, 0.09 );
 	monitor.add( diskLed );
@@ -146,8 +154,10 @@ export function buildQemuWorld() {
 		scene,
 		interactables: [],
 		defaultView: {
-			position: new THREE.Vector3( 0.5, 0.7, 8.9 ),
-			target: new THREE.Vector3( 0.5, -0.35, 0 ),
+			// Camera x sits left of the monitor so the machine lands in the
+			// right half of the frame, clear of the HUD copy on the left.
+			position: new THREE.Vector3( -1.0, 0.7, 10 ),
+			target: new THREE.Vector3( -1.0, -0.35, 0 ),
 		},
 
 		// Called by main.js for every line the console prints, so the screen
@@ -162,7 +172,7 @@ export function buildQemuWorld() {
 		setBooted( value ) {
 
 			booted = value;
-			powerLed.material.color.setHex( value ? 0x6fcf7f : 0x38424a );
+			powerLed.material.color.setHex( value ? THEME.ok : THEME.muted );
 
 		},
 
@@ -170,7 +180,7 @@ export function buildQemuWorld() {
 
 			screenFace.clear();
 			booted = false;
-			powerLed.material.color.setHex( 0xe8a33d );
+			powerLed.material.color.setHex( THEME.signal );
 
 		},
 
@@ -178,9 +188,9 @@ export function buildQemuWorld() {
 
 			elapsed += dt;
 			diskActivity = Math.max( 0, diskActivity - dt * 3.2 );
-			diskLed.material.color.setHex( diskActivity > 0.2 ? 0xe8a33d : 0x38424a );
+			diskLed.material.color.setHex( diskActivity > 0.2 ? THEME.signal : THEME.muted );
 			screenGlow.intensity = 1.2 + Math.sin( elapsed * 2.4 ) * 0.15 + diskActivity * 0.8;
-			if ( ! booted ) powerLed.material.color.setHex( 0xe8a33d );
+			if ( ! booted ) powerLed.material.color.setHex( THEME.signal );
 
 		},
 	};

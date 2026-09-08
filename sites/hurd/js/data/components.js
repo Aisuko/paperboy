@@ -1,16 +1,21 @@
+import { THEME } from '../utils/sceneKit.js';
+
 // Component registry for the GNU Hurd 3D explainer.
 // Content grounded in https://www.gnu.org/software/hurd/ and
 // https://en.wikipedia.org/wiki/GNU_Hurd (Debian GNU/Hurd "hurd" package
 // server list). Kept intentionally to a representative 18 of the Hurd's
 // ~2 dozen servers/translators so the 3D scenes stay readable.
 
+// Colours come from THEME (ultimately the --stage-*/--accent tokens in
+// css/base.css) so the category key flips with the theme. The 2D legends and
+// the inline label styles read this same map, so they follow for free.
 export const CATEGORIES = {
-	kernel: { label: 'Microkernel', color: 0x4ec9b0 },
-	core: { label: 'Core servers', color: 0xe8a33d },
-	io: { label: 'I/O translators', color: 0x6ea8fe },
-	filesystem: { label: 'Filesystem translators', color: 0xa78bfa },
-	network: { label: 'Network translators', color: 0x4dd0e1 },
-	memory: { label: 'Memory management', color: 0xef8f6e },
+	kernel: { label: 'Microkernel', color: THEME.accent },
+	core: { label: 'Core servers', color: THEME.signal },
+	io: { label: 'I/O translators', color: THEME.info },
+	filesystem: { label: 'Filesystem translators', color: THEME.violet },
+	network: { label: 'Network translators', color: THEME.cyan },
+	memory: { label: 'Memory management', color: THEME.rose },
 };
 
 export const COMPONENTS = [

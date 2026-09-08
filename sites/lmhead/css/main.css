@@ -1,0 +1,19 @@
+.foot-block { display: none; flex-direction: column; gap: 10px; }
+body[data-world="head"] .foot-block[data-foot="head"],
+body[data-world="projection"] .foot-block[data-foot="projection"],
+body[data-world="softmax"] .foot-block[data-foot="softmax"],
+body[data-world="dims"] .foot-block[data-foot="dims"] { display: flex; }
+
+.metric-note {
+	margin: 10px 0 0;
+	font-family: var(--font-mono);
+	font-size: 11px;
+	line-height: 1.55;
+	color: var(--accent);
+}
+
+.data-table td.tag { color: var(--ink); }
+.data-table tr.is-pick td.tag { color: var(--accent); }
+.data-table tr.is-warn td.num { color: var(--signal); }
+
+.step-card pre { color: var(--signal); }

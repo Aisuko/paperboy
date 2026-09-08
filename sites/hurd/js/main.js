@@ -5,6 +5,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 import { getComponent, CATEGORIES, COMPONENTS } from './data/components.js';
 import { BOOT_STEPS } from './data/bootSteps.js';
@@ -24,6 +25,9 @@ import { buildQemuWorld } from './worlds/qemu.js';
 import { ProcessConsole } from './utils/console.js';
 import { bindViewport } from './utils/viewport.js';
 import { tweenVec3, updateTweens, Easing } from './utils/tween.js';
+import { enableShadows } from './utils/sceneKit.js';
+import { enterWorld } from './utils/choreo.js';
+import { num } from '../../../js/theme.js';
 
 // ---------------------------------------------------------------- renderer
 
@@ -34,6 +38,12 @@ const renderer = new THREE.WebGLRenderer( { antialias: true, powerPreference: 'h
 renderer.setPixelRatio( Math.min( window.devicePixelRatio, 2 ) );
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
+if ( num( '--stage-shadow-gain', 0 ) > 0 ) {
+
+	renderer.shadowMap.enabled = true;
+	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+}
 container.appendChild( renderer.domElement );
 
 const labelRenderer = new CSS2DRenderer();
@@ -58,7 +68,14 @@ controls.maxPolarAngle = Math.PI * 0.54;
 controls.target.set( 0, 0, 0 );
 
 const composer = new EffectComposer( renderer );
-const bloomPass = new UnrealBloomPass( new THREE.Vector2( 1, 1 ), 0.22, 0.6, 0.62 );
+// Additive bloom reads as haze on a light stage, so the light theme dials the
+// strength down and lifts the threshold — see --bloom-* in css/base.css.
+const bloomPass = new UnrealBloomPass(
+	new THREE.Vector2( 1, 1 ),
+	0.22 * num( '--bloom-gain', 1 ),
+	0.6,
+	num( '--bloom-threshold', 0.62 ),
+);
 const outputPass = new OutputPass();
 
 // ---------------------------------------------------------------- worlds
@@ -72,6 +89,20 @@ const worlds = {
 	translators: buildTranslatorsWorld(),
 	qemu: buildQemuWorld(),
 };
+
+// One RoomEnvironment PMREM shared by every world: image-based lighting so
+// the metallic shells have something to reflect. Strength is a theme token.
+const pmrem = new THREE.PMREMGenerator( renderer );
+const envMap = pmrem.fromScene( new RoomEnvironment() ).texture;
+pmrem.dispose();
+
+Object.values( worlds ).forEach( ( world ) => {
+
+	world.scene.environment = envMap;
+	world.scene.environmentIntensity = num( '--env-intensity', 0.35 );
+	enableShadows( world.scene );
+
+} );
 
 let currentKey = 'overview';
 const renderPass = new RenderPass( worlds.overview.scene, camera );
@@ -135,6 +166,7 @@ function switchWorld( key ) {
 	stopBootAutoplay();
 	stopShellAutoplay();
 	proc.cancel();
+	clearHover();
 
 	setWorldLabelsVisible( currentKey, false );
 	currentKey = key;
@@ -143,6 +175,7 @@ function switchWorld( key ) {
 	renderPass.scene = worlds[ key ].scene;
 	setWorldLabelsVisible( key, true );
 	closeDetail();
+	enterWorld( worlds[ key ].scene );
 
 	if ( key === 'boot' ) {
 
@@ -269,9 +302,71 @@ function pickComponent( event ) {
 
 }
 
+// Hover glow: the component under the pointer gets its emissive boosted by
+// --hover-boost. Restores are guarded — if a world repaint changed a
+// material's intensity while it was boosted, that material is left alone so
+// the repaint's value wins.
+const HOVER_BOOST = num( '--hover-boost', 1 );
+let hoverRoot = null;
+let hoverSaved = [];
+
+function hoverTargetFor( obj ) {
+
+	let node = obj;
+	while ( node && ! node.userData.componentId ) node = node.parent;
+	return node || obj;
+
+}
+
+function clearHover() {
+
+	hoverSaved.forEach( ( { material, saved, boosted } ) => {
+
+		if ( Math.abs( material.emissiveIntensity - boosted ) < 1e-6 ) material.emissiveIntensity = saved;
+
+	} );
+	hoverSaved = [];
+	hoverRoot = null;
+
+}
+
+function applyHover( root ) {
+
+	if ( root === hoverRoot ) return;
+	clearHover();
+	if ( ! root ) return;
+	hoverRoot = root;
+
+	root.traverse( ( child ) => {
+
+		if ( ! child.material ) return;
+		const mats = Array.isArray( child.material ) ? child.material : [ child.material ];
+		mats.forEach( ( m ) => {
+
+			if ( ! m.emissive || ! m.emissiveIntensity ) return;
+			const saved = m.emissiveIntensity;
+			const boosted = saved * HOVER_BOOST;
+			m.emissiveIntensity = boosted;
+			hoverSaved.push( { material: m, saved, boosted } );
+
+		} );
+
+	} );
+
+}
+
 renderer.domElement.addEventListener( 'pointermove', ( event ) => {
 
-	renderer.domElement.style.cursor = pickComponent( event ) ? 'pointer' : 'grab';
+	const hit = pickComponent( event );
+	applyHover( hit ? hoverTargetFor( hit ) : null );
+	renderer.domElement.style.cursor = hit ? 'pointer' : 'grab';
+
+} );
+
+renderer.domElement.addEventListener( 'pointerleave', () => {
+
+	clearHover();
+	renderer.domElement.style.cursor = 'grab';
 
 } );
 
@@ -819,6 +914,7 @@ document.getElementById( 'qemu-replay' ).addEventListener( 'click', enterQemu );
 setActiveNav( 'overview' );
 Object.keys( worlds ).forEach( ( key ) => setWorldLabelsVisible( key, key === 'overview' ) );
 enterOverview();
+enterWorld( worlds.overview.scene );
 
 const loadingEl = document.getElementById( 'loading' );
 setTimeout( () => loadingEl.classList.add( 'hidden' ), 700 );

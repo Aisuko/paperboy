@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { addStandardLighting, createDeck, createLabel, THEME } from '../utils/sceneKit.js';
+import { addStandardLighting, createDeck, createLabel, THEME, EMISSIVE } from '../utils/sceneKit.js';
 import { createWall, createFrame, createRail, createBar, setBar, paintCell, cellMesh, cellAt } from '../utils/tensorKit.js';
 import {
 	OPS, MODELS, BY_OP, BY_ACC, BY_PREC, WEEK, BYTES_PER_PARAM,
@@ -140,7 +140,7 @@ export function buildIntensityWorld() {
 
 	const plate = new THREE.Mesh(
 		new THREE.BoxGeometry( 1, 0.2, 1.1 ),
-		new THREE.MeshStandardMaterial( { color: THEME.violet, emissive: THEME.violet, emissiveIntensity: 0.4, roughness: 0.5 } ),
+		new THREE.MeshStandardMaterial( { color: THEME.violet, emissive: THEME.violet, emissiveIntensity: 0.4 * EMISSIVE, roughness: 0.5 } ),
 	);
 	plate.position.set( 0, -1.15, 0 );
 	plate.userData = { kind: 'plate' };
@@ -196,7 +196,7 @@ export function buildIntensityWorld() {
 	interactables.push( slab, die, memBar, cmpBar, ...packets );
 
 	label( 'mem', '', 'label2d label2d-key', MEM_X, 2.5 );
-	label( 'die', '', 'label2d label2d-key', DIE_X, 2.5 );
+	label( 'die', '', 'label2d label2d-key', DIE_X, 3.15 );
 	label( 'load', 'load', 'label2d label2d-dim', ( LOAD_A + LOAD_B ) / 2, 0.9, 0.75 );
 	label( 'store', 'store', 'label2d label2d-dim', ( LOAD_A + LOAD_B ) / 2, 0.9, -0.75 );
 	label( 'memUtil', '', 'label2d label2d-dim', MEM_X, -3.7 );
@@ -240,7 +240,7 @@ export function buildIntensityWorld() {
 
 	const ridgeMark = new THREE.Mesh(
 		new THREE.BoxGeometry( 0.05, 1, 0.05 ),
-		new THREE.MeshStandardMaterial( { color: THEME.rose, emissive: THEME.rose, emissiveIntensity: 0.8 } ),
+		new THREE.MeshStandardMaterial( { color: THEME.rose, emissive: THEME.rose, emissiveIntensity: 0.8 * EMISSIVE } ),
 	);
 	ridgeMark.geometry.translate( 0, 0.5, 0 );
 	ridgeMark.userData = { kind: 'ridge' };
@@ -254,7 +254,7 @@ export function buildIntensityWorld() {
 
 		const m = new THREE.Mesh(
 			new THREE.SphereGeometry( 0.14, 18, 12 ),
-			new THREE.MeshStandardMaterial( { color: OP_COLOR[ op.key ], emissive: OP_COLOR[ op.key ], emissiveIntensity: 0.9 } ),
+			new THREE.MeshStandardMaterial( { color: OP_COLOR[ op.key ], emissive: OP_COLOR[ op.key ], emissiveIntensity: 0.9 * EMISSIVE } ),
 		);
 		m.userData = { kind: 'puck', op: op.key };
 		roof.add( m );
@@ -385,7 +385,7 @@ export function buildIntensityWorld() {
 			p.mesh.position.set( rx( THREE.MathUtils.clamp( ev.i, I_MIN, I_MAX ) ), ry( ev.attain ), 0.06 );
 			const on = p.op.key === opKey;
 			p.mesh.scale.setScalar( on ? 1.5 : 0.85 );
-			p.mesh.material.emissiveIntensity = on ? 1.2 : 0.35;
+			p.mesh.material.emissiveIntensity = ( on ? 1.2 : 0.35 ) * EMISSIVE;
 			p.cap.element.className = 'label2d ' + ( on ? 'label2d-key' : 'label2d-dim' );
 			p.cap.element.textContent = `${ p.op.label } · ${ ev.i.toFixed( 2 ) }`;
 
@@ -554,7 +554,7 @@ export function buildIntensityWorld() {
 
 			die.userData.cells.forEach( ( c, i ) => {
 
-				if ( i < Math.round( 36 * s.ev.computeUtil ) ) c.material.emissiveIntensity = 0.6 + Math.sin( flow * 6 + i ) * 0.3;
+				if ( i < Math.round( 36 * s.ev.computeUtil ) ) c.material.emissiveIntensity = ( 0.6 + Math.sin( flow * 6 + i ) * 0.3 ) * EMISSIVE;
 
 			} );
 

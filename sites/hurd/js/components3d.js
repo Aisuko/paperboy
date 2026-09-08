@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { CATEGORIES } from './data/components.js';
+import { THEME, EMISSIVE, RIM_GAIN, shellColor } from './utils/sceneKit.js';
 
 // One distinct silhouette per kind of Hurd component.
 //
@@ -15,14 +16,12 @@ import { CATEGORIES } from './data/components.js';
 // Every module also carries a status LED (drives pending/active/done) and an
 // IPC port pad on its -Z face, so links visibly plug into something.
 
-const SHELL_COLOR = 0x141a1e;
-
 function shellMaterial( color, { metalness = 0.55, roughness = 0.42 } = {} ) {
 
 	return new THREE.MeshStandardMaterial( {
-		color: SHELL_COLOR,
+		color: shellColor( color ),
 		emissive: color,
-		emissiveIntensity: 0.22,
+		emissiveIntensity: 0.22 * EMISSIVE,
 		metalness,
 		roughness,
 	} );
@@ -59,7 +58,7 @@ function addPort( group, color, position ) {
 // Status LED — recoloured by setNodeState, not by the generic emissive sweep.
 function addStatusLed( group, position ) {
 
-	const led = new THREE.Mesh( new THREE.SphereGeometry( 0.045, 10, 10 ), glowMaterial( 0x38424a ) );
+	const led = new THREE.Mesh( new THREE.SphereGeometry( 0.045, 10, 10 ), glowMaterial( THEME.muted ) );
 	led.position.copy( position );
 	led.userData.isStatusLed = true;
 	group.add( led );
@@ -105,7 +104,7 @@ function buildCore( color ) {
 
 	}
 
-	const light = new THREE.PointLight( color, 1.4, 4 );
+	const light = new THREE.PointLight( color, 1.4 * RIM_GAIN, 4 );
 	group.add( light );
 
 	group.userData.spin = 0.18;
@@ -191,7 +190,7 @@ function buildDisk( color ) {
 
 		const platter = new THREE.Mesh(
 			new THREE.CylinderGeometry( 0.4, 0.4, 0.035, 32 ),
-			new THREE.MeshStandardMaterial( { color: SHELL_COLOR, emissive: color, emissiveIntensity: 0.2, metalness: 0.9, roughness: 0.16 } ),
+			new THREE.MeshStandardMaterial( { color: shellColor( color ), emissive: color, emissiveIntensity: 0.2 * EMISSIVE, metalness: 0.9, roughness: 0.16 } ),
 		);
 		platter.position.y = -0.16 + i * 0.16;
 		stack.add( platter );
@@ -247,7 +246,7 @@ function buildDish( color ) {
 	}
 	const dishGeo = new THREE.LatheGeometry( profile, 28 );
 	const dish = new THREE.Mesh( dishGeo, new THREE.MeshStandardMaterial( {
-		color: SHELL_COLOR, emissive: color, emissiveIntensity: 0.2,
+		color: shellColor( color ), emissive: color, emissiveIntensity: 0.2 * EMISSIVE,
 		metalness: 0.6, roughness: 0.4, side: THREE.DoubleSide,
 	} ) );
 	dish.rotation.x = -Math.PI * 0.28;
@@ -334,16 +333,16 @@ const BUILDERS = {
 };
 
 const STATE_COLORS = {
-	pending: 0x38424a,
-	active: 0x4ec9b0,
-	done: 0x6fcf7f,
-	failed: 0xe5644e,
+	pending: THEME.muted,
+	active: THEME.accent,
+	done: THEME.ok,
+	failed: THEME.danger,
 };
 
 // Builds the 3D representation of a single Hurd component (see data/components.js).
 export function createComponentObject( component, { colorOverride = null } = {} ) {
 
-	const color = colorOverride ?? ( CATEGORIES[ component.category ]?.color ?? 0x4ec9b0 );
+	const color = colorOverride ?? ( CATEGORIES[ component.category ]?.color ?? THEME.accent );
 	const build = BUILDERS[ component.shape ] || buildCoupler;
 	const group = build( color );
 
