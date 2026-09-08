@@ -4,7 +4,7 @@
 	<meta charset="utf-8" />
 	<title>paperboy — 3D field guides for hard-to-see systems</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
-	<meta name="description" content="paperboy is a small collection of interactive three.js/WebGPU field guides that make hard-to-see systems easy to explore in 3D: a GNU/Hurd microkernel tour, a Transformer explainer covering the MLP, the LM head and softmax sampling, a memory-accounting guide to tensors, float formats, the trip from host RAM to GPU HBM, and the arithmetic intensity that separates memory-bound from compute-bound kernels, and an architecture guide to LayerNorm vs RMSNorm, activation functions and gated feed-forward layers." />
+	<meta name="description" content="paperboy is a small collection of interactive three.js/WebGPU field guides that make hard-to-see systems easy to explore in 3D: a GNU/Hurd microkernel tour, and a memory-accounting guide to tensors, float formats, the trip from host RAM to GPU HBM, and the arithmetic intensity that separates memory-bound from compute-bound kernels." />
 	<link rel="icon" href="favicon.svg" type="image/svg+xml" />
 	<link rel="stylesheet" href="css/main.css" />
 </head>
@@ -31,9 +31,7 @@
 			<div class="side-group">
 				<h3>Featured</h3>
 				<a href="sites/hurd/">GNU / Hurd &rarr;</a>
-				<a href="sites/cortex/">Cortex &rarr;</a>
 				<a href="sites/memory/">Memory accounting &rarr;</a>
-				<a href="sites/architecture/">Architecture &rarr;</a>
 			</div>
 			<div class="side-group">
 				<h3>Code</h3>
@@ -128,43 +126,6 @@
 					</div>
 				</a>
 
-				<a class="gallery-tile" href="sites/cortex/" data-tilt>
-					<div class="gallery-visual">
-						<svg class="node-graph" viewBox="0 0 400 260" aria-hidden="true">
-							<g class="ng-edges" stroke="currentColor" fill="none">
-								<line x1="80" y1="55" x2="200" y2="170" />
-								<line x1="150" y1="45" x2="200" y2="170" />
-								<line x1="200" y1="40" x2="200" y2="170" />
-								<line x1="250" y1="45" x2="200" y2="170" />
-								<line x1="320" y1="55" x2="200" y2="170" />
-							</g>
-							<g class="ng-nodes">
-								<circle cx="80" cy="55" r="6" />
-								<circle cx="150" cy="45" r="6" />
-								<circle cx="200" cy="40" r="6" />
-								<circle cx="250" cy="45" r="6" />
-								<circle cx="320" cy="55" r="6" />
-								<circle cx="200" cy="170" r="10" class="ng-core" />
-							</g>
-						</svg>
-						<span class="gallery-badge">live &middot; 3D tour</span>
-					</div>
-					<div class="gallery-body">
-						<div class="gallery-kicker">Transformers &middot; MLP &middot; LM head &middot; sampling</div>
-						<h3>Cortex <span class="arrow">&rarr;</span></h3>
-						<p>
-							Three components of GPT-2 small, one page each: the MLP that computes on a
-							single token, the linear layer people call the LM head, and softmax with
-							top-k and top-p &mdash; every number computed live.
-						</p>
-						<div class="gallery-tags">
-							<span>three.js</span>
-							<span>WebGPU</span>
-							<span>sampling</span>
-						</div>
-					</div>
-				</a>
-
 				<a class="gallery-tile" href="sites/memory/" data-tilt>
 					<div class="gallery-visual">
 						<svg class="node-graph" viewBox="0 0 400 260" aria-hidden="true">
@@ -206,58 +167,6 @@
 							<span>three.js</span>
 							<span>WebGPU</span>
 							<span>roofline</span>
-						</div>
-					</div>
-				</a>
-
-				<a class="gallery-tile" href="sites/architecture/" data-tilt>
-					<div class="gallery-visual">
-						<svg class="node-graph" viewBox="0 0 400 260" aria-hidden="true">
-							<g class="ng-edges" stroke="currentColor" fill="none">
-								<line x1="120" y1="22" x2="120" y2="238" />
-								<line x1="120" y1="72" x2="176" y2="72" />
-								<line x1="176" y1="72" x2="176" y2="46" />
-								<line x1="176" y1="46" x2="120" y2="46" />
-								<line x1="120" y1="142" x2="176" y2="142" />
-								<line x1="176" y1="142" x2="176" y2="116" />
-								<line x1="176" y1="116" x2="120" y2="116" />
-								<line x1="120" y1="212" x2="176" y2="212" />
-								<line x1="176" y1="212" x2="176" y2="186" />
-								<line x1="176" y1="186" x2="120" y2="186" />
-								<line x1="250" y1="200" x2="382" y2="200" />
-								<line x1="315" y1="112" x2="315" y2="218" />
-								<path d="M250 200.1 L272 201.3 L293 204.4 L299 204.8 L304 204.3 L315 200 L326 190.3 L337 176.4 L348 161.6 L358 145.3 L369 130.4 L380 116.1" />
-							</g>
-							<g class="ng-nodes">
-								<circle cx="120" cy="22" r="6" class="ng-core" />
-								<circle cx="120" cy="46" r="5" />
-								<circle cx="120" cy="116" r="5" />
-								<circle cx="120" cy="186" r="5" />
-								<circle cx="176" cy="59" r="7" />
-								<circle cx="176" cy="129" r="7" />
-								<circle cx="176" cy="199" r="7" />
-								<circle cx="120" cy="72" r="4" />
-								<circle cx="120" cy="142" r="4" />
-								<circle cx="120" cy="212" r="4" />
-								<circle cx="299" cy="204.8" r="5" />
-								<circle cx="337" cy="176.4" r="6" class="ng-core" />
-							</g>
-						</svg>
-						<span class="gallery-badge">live &middot; 3D tour</span>
-					</div>
-					<div class="gallery-body">
-						<div class="gallery-kicker">Residual stream &middot; RMSNorm &middot; activations &middot; SwiGLU</div>
-						<h3>Architecture <span class="arrow">&rarr;</span></h3>
-						<p>
-							What changed between GPT-2 and LLaMA. Why a residual stream needs normalising
-							at all, LayerNorm and RMSNorm run side by side on the same eight numbers,
-							ReLU, GeLU, Swish and SeLU drawn on one axis, and the gated feed-forward that
-							pays for a third matrix and still wins.
-						</p>
-						<div class="gallery-tags">
-							<span>three.js</span>
-							<span>WebGPU</span>
-							<span>RMSNorm</span>
 						</div>
 					</div>
 				</a>

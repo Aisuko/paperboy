@@ -41,6 +41,9 @@ const VIEWS = [
 	{ position: new THREE.Vector3( 13.65, 0.6, 15 ), target: new THREE.Vector3( 13.65, 0.55, 0 ) },
 ];
 
+// Establishing shot: matmul, week budget, memory/die and the roofline in one frame.
+const OVERVIEW = { position: new THREE.Vector3( -0.5, 2.2, 41 ), target: new THREE.Vector3( -0.5, 0.4, 0 ) };
+
 export function buildIntensityWorld() {
 
 	const scene = new THREE.Scene();
@@ -423,6 +426,7 @@ export function buildIntensityWorld() {
 		scene,
 		interactables,
 		getStepView( i ) { return VIEWS[ i ]; },
+		getOverview() { return OVERVIEW; },
 		setStep( i ) { step = i; sweep = 0; clock = 0; render(); },
 		setOp( key ) { opKey = key; render(); return state(); },
 		setBatch( b ) { batch = b; render(); return state(); },

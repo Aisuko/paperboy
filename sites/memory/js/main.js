@@ -30,7 +30,11 @@ container.appendChild( renderer.domElement );
 const labelRenderer = createLabelRenderer();
 container.appendChild( labelRenderer.domElement );
 
-const camera = new THREE.PerspectiveCamera( 28, 1, 0.1, 400 );
+const BASE_FOV = 28;
+const DESIGN_ASPECT = 16 / 9;
+const FRAME_MARGIN = 1.12;
+
+const camera = new THREE.PerspectiveCamera( BASE_FOV, 1, 0.1, 400 );
 camera.position.set( -2.0, 3.4, 20 );
 
 const controls = new OrbitControls( camera, renderer.domElement );
@@ -41,7 +45,21 @@ controls.maxDistance = 70;
 controls.maxPolarAngle = Math.PI * 0.62;
 
 const renderPipeline = createRenderPipeline( renderer );
-bindViewport( viewport, camera, [ renderer, labelRenderer ] );
+
+// The step views are framed for a wide viewport. On anything narrower the
+// horizontal extent gets clipped, so widen the vertical FOV to keep the same
+// horizontal coverage — the scene stays centred on controls.target either way.
+function frameCamera( w, h ) {
+
+	const aspect = w / h;
+	const fit = aspect < DESIGN_ASPECT ? DESIGN_ASPECT / aspect : 1;
+	const halfTan = Math.tan( THREE.MathUtils.degToRad( BASE_FOV ) * 0.5 ) * FRAME_MARGIN * fit;
+	camera.fov = Math.min( 60, THREE.MathUtils.radToDeg( 2 * Math.atan( halfTan ) ) );
+	camera.updateProjectionMatrix();
+
+}
+
+bindViewport( viewport, camera, [ renderer, labelRenderer ], frameCamera );
 
 const worlds = {
 	tensor: buildTensorWorld(),
@@ -901,6 +919,14 @@ function setWorldLabelsVisible( key, visible ) {
 
 const ENTER = { tensor: enterTensor, formats: enterFormats, transfer: enterTransfer, intensity: enterIntensity };
 
+// Opening a page should read as the whole workflow, not a close-up of step 1.
+// Once the reader has scrubbed, coming back keeps the view they were on.
+function entryView( world, index ) {
+
+	return index === 0 && world.getOverview ? world.getOverview() : world.getStepView( index );
+
+}
+
 function switchWorld( key ) {
 
 	if ( key === currentKey || ! worlds[ key ] ) return;
@@ -956,7 +982,7 @@ function enterTransfer() {
 	xferTrace( xferScrub.index );
 	setCard( 'transfer', xferScrub.index );
 	renderXferTable();
-	flyTo( worlds.transfer.getStepView( xferScrub.index ) );
+	flyTo( entryView( worlds.transfer, xferScrub.index ) );
 
 }
 
@@ -967,7 +993,7 @@ function enterIntensity() {
 	intTrace( intScrub.index );
 	setCard( 'intensity', intScrub.index );
 	renderIntTable();
-	flyTo( worlds.intensity.getStepView( intScrub.index ) );
+	flyTo( entryView( worlds.intensity, intScrub.index ) );
 
 }
 

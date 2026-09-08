@@ -18,6 +18,8 @@
 		"TZ": "Australia/Melbourne"
 	},
 
+	"postCreateCommand": "bash .devcontainer/post-create.sh",
+
 	"shutdownAction": "stopContainer"
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
